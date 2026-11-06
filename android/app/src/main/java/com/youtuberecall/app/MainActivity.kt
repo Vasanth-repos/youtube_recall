@@ -35,7 +35,7 @@ class MainActivity : AppCompatActivity() {
     private val PREFS_NAME = "recall_prefs"
     private val KEY_SERVER_URL = "server_url"
     private val DEFAULT_SERVER_URL = "http://192.168.1.4:8000"
-    val APP_ASSET_URL = "https://appassets.androidplatform.net/assets/web/index.html"
+    val APP_ASSET_URL = "https://appassets.androidplatform.net/assets/index.html"
 
     var activeServerUrl: String = DEFAULT_SERVER_URL
     private var pendingSharedVideoId: String? = null
@@ -48,6 +48,7 @@ class MainActivity : AppCompatActivity() {
 
         assetLoader = WebViewAssetLoader.Builder()
             .addPathHandler("/assets/", WebViewAssetLoader.AssetsPathHandler(this))
+            .addPathHandler("/static/", WebViewAssetLoader.AssetsPathHandler(this))
             .build()
 
         loadSavedServerUrl()
@@ -163,10 +164,12 @@ class MainActivity : AppCompatActivity() {
                         val failedUrl = request.url?.toString() ?: ""
                         if (!failedUrl.startsWith("https://appassets.androidplatform.net")) {
                             // Fallback to bundled local asset app shell
+                            Toast.makeText(this@MainActivity, "Server offline. Loading local offline mode...", Toast.LENGTH_SHORT).show()
                             view?.loadUrl(APP_ASSET_URL)
                         } else {
                             binding.offlineContainer.visibility = View.VISIBLE
                             binding.swipeRefresh.visibility = View.GONE
+                            binding.tvOfflineMessage.text = getString(R.string.offline_msg, activeServerUrl)
                         }
                     }
                 }
@@ -200,7 +203,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     fun loadApp() {
-        val targetUrl = pendingSharedVideoId?.let { "$APP_ASSET_URL?v=$it" } ?: APP_ASSET_URL
+        val base = if (activeServerUrl.isNotEmpty()) activeServerUrl else APP_ASSET_URL
+        val targetUrl = pendingSharedVideoId?.let { "$base/?v=$it" } ?: base
         binding.webView.loadUrl(targetUrl)
     }
 
@@ -253,7 +257,8 @@ class MainActivity : AppCompatActivity() {
             if (videoId != null) {
                 pendingSharedVideoId = videoId
                 Toast.makeText(this, "Capturing YouTube Video into Recall...", Toast.LENGTH_SHORT).show()
-                val targetUrl = "$APP_ASSET_URL?v=$videoId&text=${Uri.encode(sharedText)}"
+                val base = if (activeServerUrl.isNotEmpty()) activeServerUrl else APP_ASSET_URL
+                val targetUrl = "$base/?v=$videoId&text=${Uri.encode(sharedText)}"
                 binding.webView.loadUrl(targetUrl)
             }
         } else if (Intent.ACTION_VIEW == action) {
@@ -261,7 +266,8 @@ class MainActivity : AppCompatActivity() {
             val videoId = extractYouTubeVideoId(dataUri)
             if (videoId != null) {
                 pendingSharedVideoId = videoId
-                val targetUrl = "$APP_ASSET_URL?v=$videoId"
+                val base = if (activeServerUrl.isNotEmpty()) activeServerUrl else APP_ASSET_URL
+                val targetUrl = "$base/?v=$videoId"
                 binding.webView.loadUrl(targetUrl)
             }
         }
@@ -298,8 +304,8 @@ class MainActivity : AppCompatActivity() {
                 val newUrl = etUrl.text.toString().trim()
                 if (newUrl.isNotEmpty()) {
                     saveServerUrl(newUrl)
-                    Toast.makeText(this, "Server set to $activeServerUrl", Toast.LENGTH_SHORT).show()
-                    binding.webView.reload()
+                    Toast.makeText(this, "Connecting to $activeServerUrl", Toast.LENGTH_SHORT).show()
+                    loadApp()
                 }
             }
             .setNegativeButton("Cancel", null)

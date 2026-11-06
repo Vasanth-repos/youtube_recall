@@ -62,6 +62,30 @@ if FRONTEND_DIR.exists():
             return FileResponse(index_file)
         return {"message": "Frontend index.html not found"}
 
+    @app.get("/styles.css")
+    @app.head("/styles.css")
+    def serve_styles_root():
+        f = FRONTEND_DIR / "styles.css"
+        if f.exists():
+            return FileResponse(f, media_type="text/css")
+        return {"error": "styles.css not found"}
+
+    @app.get("/app.js")
+    @app.head("/app.js")
+    def serve_app_js_root():
+        f = FRONTEND_DIR / "app.js"
+        if f.exists():
+            return FileResponse(f, media_type="application/javascript")
+        return {"error": "app.js not found"}
+
+    @app.get("/icon.svg")
+    @app.head("/icon.svg")
+    def serve_icon_root():
+        f = FRONTEND_DIR / "icon.svg"
+        if f.exists():
+            return FileResponse(f, media_type="image/svg+xml")
+        return {"error": "icon.svg not found"}
+
     @app.get("/manifest.webmanifest")
     def serve_manifest():
         manifest_file = FRONTEND_DIR / "manifest.webmanifest"
