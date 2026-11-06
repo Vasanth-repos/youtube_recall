@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta, timezone
-from typing import Tuple
+from typing import Tuple, Any
 from backend.app.config import settings
 from backend.app.models import Flashcard
 
@@ -10,13 +10,16 @@ class SpacedRepetitionService:
     SCHEDULE = settings.SPACED_SCHEDULE_DAYS  # [0, 1, 3, 7, 15, 30, 60, 90, 180]
 
     @classmethod
-    def calculate_next_review(cls, card: Flashcard, rating: str) -> Tuple[datetime, int, int, float, str]:
+    def calculate_next_review(cls, card: Flashcard, rating: Any) -> Tuple[datetime, int, int, float, str]:
         """
         Calculates the next review schedule based on the exact PDF forgetting curve milestones:
         Immediately (0d) -> 1d -> 3d -> 7d -> 15d -> 30d -> 60d -> 90d -> 180d
-        Ratings: AGAIN, HARD, GOOD, EASY
+        Ratings: AGAIN (1), HARD (2), GOOD (3), EASY (4)
         """
-        rating_upper = rating.upper()
+        rating_str = str(rating).strip().upper()
+        rating_map = {"1": "AGAIN", "2": "HARD", "3": "GOOD", "4": "EASY"}
+        rating_upper = rating_map.get(rating_str, rating_str)
+
         current_step = card.step_index
         ease_factor = card.ease_factor or 2.5
         reps = (card.repetition_count or 0) + 1

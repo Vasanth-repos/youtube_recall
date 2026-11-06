@@ -52,7 +52,9 @@ def submit_card_review(card_id: int, payload: ReviewAnswerRequest, db: Session =
     if not card:
         raise HTTPException(status_code=404, detail="Flashcard not found.")
 
-    rating = payload.rating.upper()
+    raw_rating = str(payload.rating).strip().upper()
+    num_to_rating = {"1": "AGAIN", "2": "HARD", "3": "GOOD", "4": "EASY"}
+    rating = num_to_rating.get(raw_rating, raw_rating)
     valid_ratings = {"AGAIN": 1, "HARD": 2, "GOOD": 3, "EASY": 4}
     if rating not in valid_ratings:
         raise HTTPException(status_code=400, detail="Invalid rating. Choose AGAIN, HARD, GOOD, or EASY.")

@@ -333,8 +333,10 @@ function copyFullTranscript() {
 
   navigator.clipboard.writeText(out).then(() => {
     const btnText = document.getElementById("copy-transcript-text");
-    btnText.textContent = "✓ Copied to Clipboard!";
-    setTimeout(() => btnText.textContent = "Copy Full Transcript", 2000);
+    if (btnText) {
+      btnText.textContent = "✓ Copied to Clipboard!";
+      setTimeout(() => btnText.textContent = "Copy Full Transcript", 2000);
+    }
   });
 }
 
@@ -346,8 +348,8 @@ function downloadReaderMarkdown() {
 async function redistillCurrentVideo() {
   if (!currentViewingVideo) return;
   const btnText = document.getElementById("redistill-btn-text");
-  const original = btnText.textContent;
-  btnText.textContent = "⏳ Distilling...";
+  const original = btnText ? btnText.textContent : "Re-distill";
+  if (btnText) btnText.textContent = "⏳ Distilling...";
 
   try {
     const res = await fetch(`/api/videos/${currentViewingVideo.id}/redistill`, { method: "POST" });
@@ -356,11 +358,13 @@ async function redistillCurrentVideo() {
     currentViewingVideo = data;
     renderReaderView(data);
     loadStats();
-    btnText.textContent = "✓ Transcript Refined!";
-    setTimeout(() => btnText.textContent = original, 2500);
+    if (btnText) {
+      btnText.textContent = "✓ Refined!";
+      setTimeout(() => btnText.textContent = original, 2500);
+    }
   } catch (e) {
     alert("Re-distillation notice: " + e.message);
-    btnText.textContent = original;
+    if (btnText) btnText.textContent = original;
   }
 }
 
@@ -385,17 +389,22 @@ async function deleteVideoById(videoId) {
 
 // Manual Capture Modal
 function openCaptureModal() {
-  document.getElementById("capture-modal").classList.remove("hidden");
-  document.getElementById("intake-status").classList.add("hidden");
-  document.getElementById("intake-url").focus();
+  const modal = document.getElementById("capture-modal");
+  if (modal) modal.classList.remove("hidden");
+  const status = document.getElementById("intake-status");
+  if (status) status.classList.add("hidden");
+  const input = document.getElementById("intake-url");
+  if (input) input.focus();
 }
 
 function closeCaptureModal() {
-  document.getElementById("capture-modal").classList.add("hidden");
+  const modal = document.getElementById("capture-modal");
+  if (modal) modal.classList.add("hidden");
 }
 
 async function submitVideoIntake() {
-  const url = document.getElementById("intake-url").value.trim();
+  const urlEl = document.getElementById("intake-url");
+  const url = urlEl ? urlEl.value.trim() : "";
   const forceEl = document.getElementById("intake-force");
   const force = forceEl ? (forceEl.type === "checkbox" ? forceEl.checked : forceEl.value === "true") : true;
 
@@ -408,10 +417,12 @@ async function submitVideoIntake() {
   const statusBox = document.getElementById("intake-status");
   const statusText = document.getElementById("intake-status-text");
 
-  submitBtn.disabled = true;
-  submitBtn.classList.add("opacity-50");
-  statusBox.classList.remove("hidden");
-  statusText.textContent = "Transcribing & filtering conversational noise...";
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.classList.add("opacity-50");
+  }
+  if (statusBox) statusBox.classList.remove("hidden");
+  if (statusText) statusText.textContent = "Transcribing & filtering conversational noise...";
 
   try {
     const res = await fetch("/api/videos/intake", {
@@ -430,12 +441,14 @@ async function submitVideoIntake() {
       throw new Error(data.detail || "Video transcription failed");
     }
 
-    statusText.textContent = "Smart transcript distilled successfully!";
+    if (statusText) statusText.textContent = "Smart transcript distilled successfully!";
     setTimeout(() => {
       closeCaptureModal();
-      submitBtn.disabled = false;
-      submitBtn.classList.remove("opacity-50");
-      document.getElementById("intake-url").value = "";
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.classList.remove("opacity-50");
+      }
+      if (urlEl) urlEl.value = "";
       loadVideos().then(() => {
         openReaderForVideo(data.video_id);
       });
@@ -443,9 +456,11 @@ async function submitVideoIntake() {
 
   } catch (e) {
     alert("Transcription Error: " + e.message);
-    submitBtn.disabled = false;
-    submitBtn.classList.remove("opacity-50");
-    statusBox.classList.add("hidden");
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.classList.remove("opacity-50");
+    }
+    if (statusBox) statusBox.classList.add("hidden");
   }
 }
 
@@ -456,31 +471,38 @@ async function loadSettings() {
     if (!res.ok) return;
     const data = await res.json();
 
-    document.getElementById("setting-provider").value = data.DEFAULT_AI_PROVIDER || "local_offline";
-    document.getElementById("setting-obsidian-path").value = data.OBSIDIAN_VAULT_PATH || "";
-    document.getElementById("setting-notion-db").value = data.NOTION_DATABASE_ID || "";
+    const prov = document.getElementById("setting-provider");
+    if (prov) prov.value = data.DEFAULT_AI_PROVIDER || "local_offline";
+    const obs = document.getElementById("setting-obsidian-path");
+    if (obs) obs.value = data.OBSIDIAN_VAULT_PATH || "";
+    const notEl = document.getElementById("setting-notion-db");
+    if (notEl) notEl.value = data.NOTION_DATABASE_ID || "";
   } catch (e) {
     console.error("Failed to load settings:", e);
   }
 }
 
 async function saveSettings() {
+  const provEl = document.getElementById("setting-provider");
+  const obsEl = document.getElementById("setting-obsidian-path");
+  const notEl = document.getElementById("setting-notion-db");
+
   const payload = {
     settings: {
-      DEFAULT_AI_PROVIDER: document.getElementById("setting-provider").value,
-      OBSIDIAN_VAULT_PATH: document.getElementById("setting-obsidian-path").value,
-      NOTION_DATABASE_ID: document.getElementById("setting-notion-db").value,
+      DEFAULT_AI_PROVIDER: provEl ? provEl.value : "gemini",
+      OBSIDIAN_VAULT_PATH: obsEl ? obsEl.value : "",
+      NOTION_DATABASE_ID: notEl ? notEl.value : ""
     }
   };
 
-  const geminiKey = document.getElementById("setting-gemini-key").value.trim();
-  if (geminiKey) payload.settings.GEMINI_API_KEY = geminiKey;
+  const geminiEl = document.getElementById("setting-gemini-key");
+  if (geminiEl && geminiEl.value.trim()) payload.settings.GEMINI_API_KEY = geminiEl.value.trim();
 
-  const groqKey = document.getElementById("setting-groq-key").value.trim();
-  if (groqKey) payload.settings.GROQ_API_KEY = groqKey;
+  const groqEl = document.getElementById("setting-groq-key");
+  if (groqEl && groqEl.value.trim()) payload.settings.GROQ_API_KEY = groqEl.value.trim();
 
-  const notionKey = document.getElementById("setting-notion-key").value.trim();
-  if (notionKey) payload.settings.NOTION_API_KEY = notionKey;
+  const notionEl = document.getElementById("setting-notion-key");
+  if (notionEl && notionEl.value.trim()) payload.settings.NOTION_API_KEY = notionEl.value.trim();
 
   try {
     const res = await fetch("/api/settings", {

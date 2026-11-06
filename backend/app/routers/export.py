@@ -54,6 +54,7 @@ def export_to_anki(payload: ExportRequest, db: Session = Depends(get_db)):
 
     return AnkiExporter.sync_to_ankiconnect(video, payload.deck_name)
 
+@router.get("/anki/{video_id}/download")
 @router.get("/anki/{video_id}/download-tsv")
 def download_anki_tsv(video_id: int, db: Session = Depends(get_db)):
     """Generates and downloads Anki-compatible TSV file for easy card import on desktop or mobile."""

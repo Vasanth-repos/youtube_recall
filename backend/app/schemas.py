@@ -1,4 +1,4 @@
-from typing import List, Optional, Any, Dict
+from typing import List, Optional, Any, Dict, Union
 from datetime import datetime
 from pydantic import BaseModel, Field
 
@@ -67,7 +67,7 @@ class VideoResponse(BaseModel):
         from_attributes = True
 
 class ReviewAnswerRequest(BaseModel):
-    rating: str = Field(..., description="AGAIN, HARD, GOOD, or EASY")
+    rating: Union[str, int] = Field(..., description="AGAIN (1), HARD (2), GOOD (3), or EASY (4)")
     time_taken_ms: Optional[int] = 0
 
 class ReviewLogResponse(BaseModel):

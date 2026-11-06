@@ -242,7 +242,7 @@ class AIService:
     @classmethod
     def _call_gemini(cls, prompt: str, api_key: str) -> Optional[Dict[str, Any]]:
         """Calls Google AI Studio / Gemini API using candidate models with automatic fallback."""
-        candidate_models = ["gemini-3.5-flash", "gemini-3.5-flash-lite", "gemini-3.8-flash"]
+        candidate_models = ["gemini-3.5-flash", "gemini-3.5-flash-lite"]
         for model in candidate_models:
             url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
             payload = {
@@ -253,7 +253,7 @@ class AIService:
                 }
             }
             try:
-                resp = requests.post(url, json=payload, timeout=40)
+                resp = requests.post(url, json=payload, timeout=10)
                 if resp.status_code == 200:
                     data = resp.json()
                     candidates = data.get("candidates", [])
@@ -306,15 +306,34 @@ class AIService:
 
     @staticmethod
     def _parse_json_response(text: str) -> Optional[Dict[str, Any]]:
+        if not text:
+            return None
+        cleaned = text.strip()
+        if cleaned.startswith("```json"):
+            cleaned = cleaned[7:]
+        if cleaned.startswith("```"):
+            cleaned = cleaned[3:]
+        if cleaned.endswith("```"):
+            cleaned = cleaned[:-3]
+        cleaned = cleaned.strip()
+
+        # 1. Standard JSON parse
         try:
-            cleaned = text.strip()
-            if cleaned.startswith("```json"):
-                cleaned = cleaned[7:]
-            if cleaned.startswith("```"):
-                cleaned = cleaned[3:]
-            if cleaned.endswith("```"):
-                cleaned = cleaned[:-3]
-            return json.loads(cleaned.strip())
+            return json.loads(cleaned)
+        except json.JSONDecodeError:
+            pass
+
+        # 2. Repair invalid LaTeX / mathematical notation escapes (e.g. \cos, \frac, \sum, \int, \alpha)
+        try:
+            repaired = re.sub(r'\\([^"\\/bfnrtu])', r'\\\\\1', cleaned)
+            return json.loads(repaired)
+        except json.JSONDecodeError:
+            pass
+
+        # 3. Non-strict parse for unescaped control characters
+        try:
+            repaired = re.sub(r'\\([^"\\/bfnrtu])', r'\\\\\1', cleaned)
+            return json.loads(repaired, strict=False)
         except Exception as e:
             logger.warning(f"Failed to parse model JSON: {e}. Raw snippet: {text[:200]}")
             return None
