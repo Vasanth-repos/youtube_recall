@@ -5,6 +5,25 @@ let currentViewingVideo = null;
 let activeCategory = "";
 let currentSort = "recently_watched";
 
+// Dynamic API Base URL resolution for Native Android APK & Web deployments
+function apiUrl(path) {
+  let base = "";
+  if (window.AndroidBridge && typeof window.AndroidBridge.getServerUrl === "function") {
+    try {
+      const b = window.AndroidBridge.getServerUrl();
+      if (b && b.trim()) base = b.trim().replace(/\/+$/, "");
+    } catch (e) {}
+  }
+  if (!base) {
+    const stored = localStorage.getItem("recall_server_url");
+    if (stored && stored.trim()) base = stored.trim().replace(/\/+$/, "");
+  }
+  if (!base && (window.location.hostname === "appassets.androidplatform.net" || window.location.protocol === "file:")) {
+    base = "http://192.168.1.4:8000";
+  }
+  return base ? `${base}${path.startsWith('/') ? path : '/' + path}` : path;
+}
+
 // Elegant Non-Blocking Toast Notification Helper
 function showToastNotification(message, type = "info", durationMs = 3500) {
   const container = document.getElementById("toast-container");
@@ -169,8 +188,8 @@ function switchTab(tab) {
 async function loadStats() {
   try {
     const [vidRes, statRes] = await Promise.all([
-      fetch("/api/videos"),
-      fetch("/api/flashcards/stats")
+      fetch(apiUrl("/api/videos")),
+      fetch(apiUrl("/api/flashcards/stats"))
     ]);
 
     if (vidRes.ok) {
@@ -181,84 +200,96 @@ async function loadStats() {
 
     if (statRes.ok) {
       const stats = await statRes.json();
-      const dueCount = stats.cards_due_today || 0;
-      const masteredCount = stats.cards_mastered || 0;
-      const reviewsCount = stats.total_reviews || 0;
-
-      // Update overview strip
-      const dueEl = document.getElementById("stat-cards-due");
-      if (dueEl) dueEl.textContent = dueCount;
-      const mastEl = document.getElementById("stat-cards-mastered");
-      if (mastEl) mastEl.textContent = masteredCount;
-      const revEl = document.getElementById("stat-total-reviews");
-      if (revEl) revEl.textContent = reviewsCount;
-
-      // Update practice header metrics
-      const mDue = document.getElementById("metric-due-count");
-      if (mDue) mDue.textContent = dueCount;
-      const mMast = document.getElementById("metric-mastered-count");
-      if (mMast) mMast.textContent = masteredCount;
-      const mRev = document.getElementById("metric-reviews-count");
-      if (mRev) mRev.textContent = reviewsCount;
-
-      // Update navigation badges
-      const navBadge = document.getElementById("nav-due-badge");
-      const mobBadge = document.getElementById("mob-due-badge");
-
-      if (dueCount > 0) {
-        if (navBadge) {
-          navBadge.textContent = dueCount;
-          navBadge.classList.remove("hidden");
-        }
-        if (mobBadge) {
-          mobBadge.textContent = dueCount;
-          mobBadge.classList.remove("hidden");
-        }
-      } else {
-        if (navBadge) navBadge.classList.add("hidden");
-        if (mobBadge) mobBadge.classList.add("hidden");
-      }
+      try { localStorage.setItem("cached_stats", JSON.stringify(stats)); } catch (e) {}
+      applyStatsToUI(stats);
     }
   } catch (e) {
-    console.error("Failed to load stats:", e);
+    console.warn("Failed to load live stats (using offline cache):", e);
+    try {
+      const cached = localStorage.getItem("cached_stats");
+      if (cached) applyStatsToUI(JSON.parse(cached));
+    } catch (e2) {}
+  }
+}
+
+function applyStatsToUI(stats) {
+  const dueCount = stats.cards_due_today || 0;
+  const masteredCount = stats.cards_mastered || 0;
+  const reviewsCount = stats.total_reviews || 0;
+
+  const dueEl = document.getElementById("stat-cards-due");
+  if (dueEl) dueEl.textContent = dueCount;
+  const mastEl = document.getElementById("stat-cards-mastered");
+  if (mastEl) mastEl.textContent = masteredCount;
+  const revEl = document.getElementById("stat-total-reviews");
+  if (revEl) revEl.textContent = reviewsCount;
+
+  const mDue = document.getElementById("metric-due-count");
+  if (mDue) mDue.textContent = dueCount;
+  const mMast = document.getElementById("metric-mastered-count");
+  if (mMast) mMast.textContent = masteredCount;
+  const mRev = document.getElementById("metric-reviews-count");
+  if (mRev) mRev.textContent = reviewsCount;
+
+  const navBadge = document.getElementById("nav-due-badge");
+  const mobBadge = document.getElementById("mob-due-badge");
+
+  if (dueCount > 0) {
+    if (navBadge) { navBadge.textContent = dueCount; navBadge.classList.remove("hidden"); }
+    if (mobBadge) { mobBadge.textContent = dueCount; mobBadge.classList.remove("hidden"); }
+  } else {
+    if (navBadge) navBadge.classList.add("hidden");
+    if (mobBadge) mobBadge.classList.add("hidden");
   }
 }
 
 // Load Videos
 async function loadVideos() {
   try {
-    const res = await fetch(`/api/videos?sort_by=${encodeURIComponent(currentSort)}`);
-    if (!res.ok) return;
-    allVideos = await res.json();
-    renderVideosGrid();
-    loadStats();
-
-    // Check if query parameter has ?v= or ?video_id=
-    const params = new URLSearchParams(window.location.search);
-    const targetV = params.get("v") || params.get("video_id");
-    if (targetV) {
-      const match = allVideos.find(v => v.video_id === targetV || String(v.id) === targetV);
-      if (match) {
-        openReaderForVideo(match.video_id);
-        window.history.replaceState({}, document.title, window.location.pathname);
-        return;
-      } else {
-        // Shared from mobile YouTube App or new link: auto-intake & distill!
-        await autoIntakeSharedVideo(targetV);
-        return;
-      }
-    }
-
-    // Auto-select first video into Reader if none selected
-    if (!currentViewingVideo && allVideos.length > 0) {
-      currentViewingVideo = allVideos[0];
-      const dot = document.getElementById("active-video-dot");
-      if (dot) dot.classList.remove("hidden");
-      const mobDot = document.getElementById("mob-active-video-dot");
-      if (mobDot) mobDot.classList.remove("hidden");
+    const res = await fetch(apiUrl(`/api/videos?sort_by=${encodeURIComponent(currentSort)}`));
+    if (res.ok) {
+      allVideos = await res.json();
+      try { localStorage.setItem("cached_videos", JSON.stringify(allVideos)); } catch (e) {}
+    } else {
+      throw new Error("HTTP " + res.status);
     }
   } catch (e) {
-    console.error("Failed to load videos:", e);
+    console.warn("Server offline or unreachable, loading cached library:", e);
+    try {
+      const cached = localStorage.getItem("cached_videos");
+      if (cached) {
+        allVideos = JSON.parse(cached);
+        showToastNotification("Offline mode: Viewing cached library", "info", 2500);
+      }
+    } catch (e2) {}
+  }
+
+  renderVideosGrid();
+  loadStats();
+
+  // Check if query parameter has ?v= or ?video_id=
+  const params = new URLSearchParams(window.location.search);
+  const targetV = params.get("v") || params.get("video_id");
+  if (targetV) {
+    const match = allVideos.find(v => v.video_id === targetV || String(v.id) === targetV);
+    if (match) {
+      openReaderForVideo(match.video_id);
+      window.history.replaceState({}, document.title, window.location.pathname);
+      return;
+    } else {
+      // Shared from mobile YouTube App or new link: auto-intake & distill!
+      await autoIntakeSharedVideo(targetV);
+      return;
+    }
+  }
+
+  // Auto-select first video into Reader if none selected
+  if (!currentViewingVideo && allVideos.length > 0) {
+    currentViewingVideo = allVideos[0];
+    const dot = document.getElementById("active-video-dot");
+    if (dot) dot.classList.remove("hidden");
+    const mobDot = document.getElementById("mob-active-video-dot");
+    if (mobDot) mobDot.classList.remove("hidden");
   }
 }
 
@@ -266,7 +297,7 @@ async function loadVideos() {
 async function autoIntakeSharedVideo(videoId) {
   showToastNotification("✨ Capturing YouTube video... extracting transcript", "info", 6000);
   try {
-    const res = await fetch("/api/videos/intake", {
+    const res = await fetch(apiUrl("/api/videos/intake"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -277,7 +308,7 @@ async function autoIntakeSharedVideo(videoId) {
     const data = await res.json();
     if (res.ok && data.video_id) {
       showToastNotification(`✓ Distilled: ${(data.title || "Video").substring(0, 32)}...`, "success", 4000);
-      const listRes = await fetch(`/api/videos?sort_by=${encodeURIComponent(currentSort)}`);
+      const listRes = await fetch(apiUrl(`/api/videos?sort_by=${encodeURIComponent(currentSort)}`));
       if (listRes.ok) {
         allVideos = await listRes.json();
         renderVideosGrid();
@@ -613,7 +644,7 @@ async function redistillCurrentVideo() {
   if (btnText) btnText.textContent = "⏳ Distilling...";
 
   try {
-    const res = await fetch(`/api/videos/${currentViewingVideo.id}/redistill`, { method: "POST" });
+    const res = await fetch(apiUrl(`/api/videos/${currentViewingVideo.id}/redistill`), { method: "POST" });
     if (!res.ok) throw new Error("Failed to re-distill transcript");
     const data = await res.json();
     currentViewingVideo = data;
@@ -631,13 +662,13 @@ async function redistillCurrentVideo() {
 }
 
 function downloadMarkdownById(videoId) {
-  window.location.href = `/api/export/obsidian/${videoId}/download`;
+  window.location.href = apiUrl(`/api/export/obsidian/${videoId}/download`);
 }
 
 async function deleteVideoById(videoId, videoTitle = "this video") {
   if (!confirm(`Remove "${videoTitle}" from your library?`)) return;
   try {
-    const res = await fetch(`/api/videos/${videoId}`, { method: "DELETE" });
+    const res = await fetch(apiUrl(`/api/videos/${videoId}`), { method: "DELETE" });
     if (res.ok) {
       if (currentViewingVideo && currentViewingVideo.id === videoId) {
         currentViewingVideo = null;
@@ -691,7 +722,7 @@ async function submitVideoIntake() {
   if (statusText) statusText.textContent = "Transcribing & filtering conversational noise...";
 
   try {
-    const res = await fetch("/api/videos/intake", {
+    const res = await fetch(apiUrl("/api/videos/intake"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -734,7 +765,7 @@ async function submitVideoIntake() {
 // Settings
 async function loadSettings() {
   try {
-    const res = await fetch("/api/settings");
+    const res = await fetch(apiUrl("/api/settings"));
     if (!res.ok) return;
     const data = await res.json();
 
@@ -772,7 +803,7 @@ async function saveSettings() {
   if (notionEl && notionEl.value.trim()) payload.settings.NOTION_API_KEY = notionEl.value.trim();
 
   try {
-    const res = await fetch("/api/settings", {
+    const res = await fetch(apiUrl("/api/settings"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
@@ -801,7 +832,7 @@ async function testGeminiKey() {
   if (testBtn) testBtn.disabled = true;
 
   try {
-    const res = await fetch("/api/settings/test-gemini", {
+    const res = await fetch(apiUrl("/api/settings/test-gemini"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ api_key: key })
@@ -844,7 +875,7 @@ function copyCurrentOrigin() {
 // YouTube Account Status & Sync
 async function loadAccountStatus() {
   try {
-    const res = await fetch("/api/youtube/status");
+    const res = await fetch(apiUrl("/api/youtube/status"));
     if (!res.ok) return;
     const data = await res.json();
 
@@ -923,9 +954,10 @@ async function startFlashcardSession(filterVideoId = null) {
       url = `/api/flashcards/all?limit=100`;
     }
 
-    const res = await fetch(url);
+    const res = await fetch(apiUrl(url));
     if (!res.ok) throw new Error("Could not load flashcards");
     let cards = await res.json();
+    try { localStorage.setItem("cached_flashcards", JSON.stringify(cards)); } catch (e) {}
 
     if (filterVideoId) {
       cards = cards.filter(c => c.video_id === filterVideoId);
@@ -958,10 +990,11 @@ async function loadAllCardsSession() {
   if (statusChip) statusChip.textContent = "All Cards Review";
   
   try {
-    const res = await fetch("/api/flashcards/all?limit=100");
+    const res = await fetch(apiUrl("/api/flashcards/all?limit=100"));
     if (!res.ok) return;
     const cards = await res.json();
     activeFlashcards = cards;
+    try { localStorage.setItem("cached_flashcards", JSON.stringify(cards)); } catch (e) {}
     currentCardIndex = 0;
 
     const container = document.getElementById("flashcard-study-container");
@@ -1056,7 +1089,7 @@ async function rateCurrentCard(rating) {
   const timeTaken = cardStartTime ? (Date.now() - cardStartTime) : 1000;
 
   try {
-    await fetch(`/api/flashcards/${card.id}/review`, {
+    await fetch(apiUrl(`/api/flashcards/${card.id}/review`), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -1083,7 +1116,7 @@ function practiceCardsForCurrentVideo() {
 
 function downloadReaderAnki() {
   if (!currentViewingVideo) return;
-  window.location.href = `/api/export/anki/${currentViewingVideo.id}/download`;
+  window.location.href = apiUrl(`/api/export/anki/${currentViewingVideo.id}/download`);
 }
 
 // Global Keyboard Navigation for Study Sessions

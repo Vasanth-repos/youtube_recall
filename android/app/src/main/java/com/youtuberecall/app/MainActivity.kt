@@ -14,6 +14,7 @@ import android.webkit.URLUtil
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -23,6 +24,7 @@ import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.webkit.WebViewAssetLoader
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.youtuberecall.app.databinding.ActivityMainBinding
 import java.util.regex.Pattern
@@ -33,14 +35,20 @@ class MainActivity : AppCompatActivity() {
     private val PREFS_NAME = "recall_prefs"
     private val KEY_SERVER_URL = "server_url"
     private val DEFAULT_SERVER_URL = "http://192.168.1.4:8000"
+    val APP_ASSET_URL = "https://appassets.androidplatform.net/assets/web/index.html"
 
-    private var activeServerUrl: String = DEFAULT_SERVER_URL
+    var activeServerUrl: String = DEFAULT_SERVER_URL
     private var pendingSharedVideoId: String? = null
+    private lateinit var assetLoader: WebViewAssetLoader
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
+
+        assetLoader = WebViewAssetLoader.Builder()
+            .addPathHandler("/assets/", WebViewAssetLoader.AssetsPathHandler(this))
+            .build()
 
         loadSavedServerUrl()
         setupWebView()
@@ -78,6 +86,8 @@ class MainActivity : AppCompatActivity() {
 
     @SuppressLint("SetJavaScriptEnabled")
     private fun setupWebView() {
+        val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+
         binding.webView.apply {
             settings.apply {
                 javaScriptEnabled = true
@@ -85,12 +95,14 @@ class MainActivity : AppCompatActivity() {
                 databaseEnabled = true
                 useWideViewPort = true
                 loadWithOverviewMode = true
+                allowFileAccess = true
+                allowContentAccess = true
                 cacheMode = WebSettings.LOAD_DEFAULT
                 mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
-                userAgentString = "$userAgentString YouTubeRecallAndroid/1.0"
+                userAgentString = "$userAgentString YouTubeRecallAndroid/1.1.0"
             }
 
-            addJavascriptInterface(WebAppInterface(this@MainActivity), "AndroidBridge")
+            addJavascriptInterface(WebAppInterface(this@MainActivity, prefs), "AndroidBridge")
 
             webChromeClient = object : WebChromeClient() {
                 override fun onProgressChanged(view: WebView?, newProgress: Int) {
@@ -105,15 +117,25 @@ class MainActivity : AppCompatActivity() {
             }
 
             webViewClient = object : WebViewClient() {
+                override fun shouldInterceptRequest(view: WebView?, request: WebResourceRequest?): WebResourceResponse? {
+                    val url = request?.url ?: return null
+                    return assetLoader.shouldInterceptRequest(url)
+                }
+
                 override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
                     val url = request?.url?.toString() ?: return false
 
-                    // Keep internal backend / app routes inside WebView
-                    if (url.startsWith(activeServerUrl) || url.startsWith("http://localhost") || url.startsWith("http://10.0.2.2") || url.startsWith("http://192.168.")) {
+                    // Keep local app assets and backend endpoints inside WebView
+                    if (url.startsWith("https://appassets.androidplatform.net") ||
+                        url.startsWith(activeServerUrl) ||
+                        url.startsWith("http://localhost") ||
+                        url.startsWith("http://127.0.0.1") ||
+                        url.startsWith("http://10.0.2.2") ||
+                        url.startsWith("http://192.168.")) {
                         return false
                     }
 
-                    // Open external web links (like original YouTube watch pages) in external browser
+                    // Open external links (like YouTube watch links) in external browser/YouTube app
                     try {
                         val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
                         startActivity(browserIntent)
@@ -128,9 +150,9 @@ class MainActivity : AppCompatActivity() {
                     binding.offlineContainer.visibility = View.GONE
                     binding.swipeRefresh.visibility = View.VISIBLE
 
-                    // If a video was shared, inject intake trigger
+                    // If a video was shared via Android Share Sheet, auto-distill it
                     pendingSharedVideoId?.let { vid ->
-                        val script = "if (window.openReaderForVideo) { window.openReaderForVideo('$vid'); } else { window.location.href = '/?v=$vid'; }"
+                        val script = "if (window.autoIntakeSharedVideo) { window.autoIntakeSharedVideo('$vid'); } else if (window.openReaderForVideo) { window.openReaderForVideo('$vid'); }"
                         view?.evaluateJavascript(script, null)
                         pendingSharedVideoId = null
                     }
@@ -138,9 +160,14 @@ class MainActivity : AppCompatActivity() {
 
                 override fun onReceivedError(view: WebView?, request: WebResourceRequest?, error: WebResourceError?) {
                     if (request?.isForMainFrame == true) {
-                        binding.offlineContainer.visibility = View.VISIBLE
-                        binding.swipeRefresh.visibility = View.GONE
-                        binding.tvOfflineMessage.text = getString(R.string.offline_msg, activeServerUrl)
+                        val failedUrl = request.url?.toString() ?: ""
+                        if (!failedUrl.startsWith("https://appassets.androidplatform.net")) {
+                            // Fallback to bundled local asset app shell
+                            view?.loadUrl(APP_ASSET_URL)
+                        } else {
+                            binding.offlineContainer.visibility = View.VISIBLE
+                            binding.swipeRefresh.visibility = View.GONE
+                        }
                     }
                 }
             }
@@ -172,8 +199,8 @@ class MainActivity : AppCompatActivity() {
         loadApp()
     }
 
-    private fun loadApp() {
-        val targetUrl = pendingSharedVideoId?.let { "$activeServerUrl/?v=$it" } ?: activeServerUrl
+    fun loadApp() {
+        val targetUrl = pendingSharedVideoId?.let { "$APP_ASSET_URL?v=$it" } ?: APP_ASSET_URL
         binding.webView.loadUrl(targetUrl)
     }
 
@@ -226,7 +253,7 @@ class MainActivity : AppCompatActivity() {
             if (videoId != null) {
                 pendingSharedVideoId = videoId
                 Toast.makeText(this, "Capturing YouTube Video into Recall...", Toast.LENGTH_SHORT).show()
-                val targetUrl = "$activeServerUrl/?v=$videoId&text=${Uri.encode(sharedText)}"
+                val targetUrl = "$APP_ASSET_URL?v=$videoId&text=${Uri.encode(sharedText)}"
                 binding.webView.loadUrl(targetUrl)
             }
         } else if (Intent.ACTION_VIEW == action) {
@@ -234,7 +261,7 @@ class MainActivity : AppCompatActivity() {
             val videoId = extractYouTubeVideoId(dataUri)
             if (videoId != null) {
                 pendingSharedVideoId = videoId
-                val targetUrl = "$activeServerUrl/?v=$videoId"
+                val targetUrl = "$APP_ASSET_URL?v=$videoId"
                 binding.webView.loadUrl(targetUrl)
             }
         }
@@ -248,7 +275,7 @@ class MainActivity : AppCompatActivity() {
         } else null
     }
 
-    private fun showServerUrlDialog() {
+    fun showServerUrlDialog() {
         val dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_server_url, null)
         val etUrl = dialogView.findViewById<EditText>(R.id.etServerUrl)
         val btnPresetLan = dialogView.findViewById<Button>(R.id.btnPresetLan)
@@ -271,12 +298,11 @@ class MainActivity : AppCompatActivity() {
                 val newUrl = etUrl.text.toString().trim()
                 if (newUrl.isNotEmpty()) {
                     saveServerUrl(newUrl)
-                    Toast.makeText(this, "Connecting to $activeServerUrl", Toast.LENGTH_SHORT).show()
-                    loadApp()
+                    Toast.makeText(this, "Server set to $activeServerUrl", Toast.LENGTH_SHORT).show()
+                    binding.webView.reload()
                 }
             }
             .setNegativeButton("Cancel", null)
             .show()
     }
 }
-

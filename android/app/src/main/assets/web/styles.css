@@ -1,0 +1,295 @@
+/* ==========================================================================
+   YouTube Recall — Editorial Knowledge System Theme
+   Human-crafted typography, warm obsidian paper palette & bespoke micro-details
+   ========================================================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Newsreader:ital,opsz,wght@0,6..72,400..600;1,6..72,400&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+
+:root {
+  --bg-canvas: #0c0d0f;
+  --bg-surface: #141518;
+  --bg-surface-elevated: #1a1b1f;
+  --bg-surface-hover: #212328;
+  --border-hairline: #26272e;
+  --border-focus: #3f424e;
+  
+  --text-primary: #f4f4f6;
+  --text-secondary: #9da0ab;
+  --text-muted: #6b6e79;
+
+  --accent-amber: #f59e0b;
+  --accent-amber-hover: #d97706;
+  --accent-subtle: rgba(245, 158, 11, 0.08);
+  --accent-border: rgba(245, 158, 11, 0.25);
+}
+
+body {
+  background-color: var(--bg-canvas);
+  color: var(--text-primary);
+  font-family: "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
+  letter-spacing: -0.011em;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Editorial Title Typography */
+.font-editorial {
+  font-family: "Newsreader", Georgia, serif;
+  font-feature-settings: "liga" 1, "kern" 1;
+}
+
+/* Refined Monospace */
+.font-mono-chip {
+  font-family: "JetBrains Mono", monospace;
+  letter-spacing: -0.03em;
+}
+
+/* Nav Tab Styling - Understated Editorial */
+.nav-tab {
+  color: var(--text-muted);
+  font-weight: 500;
+  transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+  position: relative;
+}
+
+.nav-tab:hover {
+  color: var(--text-primary);
+  background-color: rgba(255, 255, 255, 0.04);
+}
+
+.nav-tab.active {
+  color: var(--text-primary);
+  background-color: rgba(255, 255, 255, 0.08);
+}
+
+/* Category Filter Pills */
+.category-pill {
+  transition: all 0.15s ease;
+  font-weight: 500;
+  cursor: pointer;
+  user-select: none;
+}
+
+.category-pill:hover {
+  border-color: var(--border-focus);
+  color: #ffffff;
+}
+
+.category-pill.active {
+  background-color: #f4f4f6;
+  color: #0c0d0f;
+  border-color: #f4f4f6;
+  font-weight: 600;
+}
+
+/* Smooth Minimal Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #23252c;
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #333640;
+}
+
+/* Mobile Ergonomics & Native Bottom Nav */
+.mob-nav-tab {
+  color: var(--text-muted);
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  transition: all 0.15s ease;
+}
+
+.mob-nav-tab:active {
+  transform: scale(0.94);
+}
+
+.mob-nav-tab.active {
+  color: var(--accent-amber);
+}
+
+.mob-nav-tab.active i {
+  color: var(--accent-amber);
+  stroke-width: 2.25;
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+html {
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+}
+
+/* Card Transitions */
+.editorial-card {
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.15s ease, box-shadow 0.2s ease;
+}
+
+.editorial-card:hover {
+  border-color: var(--border-focus);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px -6px rgba(0, 0, 0, 0.4);
+}
+
+#active-flashcard-box {
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s ease, box-shadow 0.25s ease;
+}
+
+#active-flashcard-box:hover {
+  border-color: rgba(245, 158, 11, 0.35);
+  box-shadow: 0 12px 36px -10px rgba(0, 0, 0, 0.6);
+}
+
+/* Answer Reveal Animation */
+#card-answer-wrapper {
+  animation: answerReveal 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes answerReveal {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Input Focus Ring */
+input:focus, select:focus {
+  outline: none;
+  border-color: var(--accent-amber) !important;
+  box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.25);
+}
+
+/* Modal Animations */
+.modal-overlay {
+  animation: fadeInBackdrop 0.2s ease-out forwards;
+}
+
+.modal-content {
+  animation: scaleInModal 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes fadeInBackdrop {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes scaleInModal {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* Elegant Non-Blocking Toast Notification System */
+#toast-container {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
+  max-width: 90vw;
+  width: 360px;
+}
+
+@media (max-width: 640px) {
+  #toast-container {
+    bottom: 84px; /* Above mobile bottom navigation */
+    right: 16px;
+    left: 16px;
+    width: auto;
+  }
+}
+
+.app-toast {
+  pointer-events: auto;
+  background-color: #141518;
+  border: 1px solid #272930;
+  color: #f4f4f6;
+  padding: 12px 16px;
+  border-radius: 12px;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.7);
+  animation: toastSlideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.app-toast.toast-success {
+  border-color: rgba(34, 197, 94, 0.4);
+  background: linear-gradient(135deg, #141518 0%, #111d15 100%);
+}
+
+.app-toast.toast-success .toast-icon {
+  color: #4ade80;
+}
+
+.app-toast.toast-error {
+  border-color: rgba(239, 68, 68, 0.4);
+  background: linear-gradient(135deg, #141518 0%, #201314 100%);
+}
+
+.app-toast.toast-error .toast-icon {
+  color: #f87171;
+}
+
+.app-toast.toast-info {
+  border-color: rgba(245, 158, 11, 0.4);
+  background: linear-gradient(135deg, #141518 0%, #1c1811 100%);
+}
+
+.app-toast.toast-info .toast-icon {
+  color: #fbbf24;
+}
+
+.app-toast.toast-fadeout {
+  opacity: 0;
+  transform: translateY(10px);
+}
+
+@keyframes toastSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Skeleton Loading Placeholder */
+.skeleton-shimmer {
+  background: linear-gradient(90deg, #1a1b1f 25%, #252830 50%, #1a1b1f 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
