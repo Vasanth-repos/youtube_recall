@@ -1,7 +1,7 @@
 // YouTube Recall - Automatic Watch & Transcribe Content Script
 (function() {
   const SERVER_URL = "http://localhost:8000";
-  const AUTO_TRIGGER_SECONDS = 8; // Automatically transcribes after 8 seconds of active watch time
+  const AUTO_TRIGGER_SECONDS = 2; // Automatically transcribes after 2 seconds of playback
   
   let currentVideoId = null;
   let activeWatchSeconds = 0;
@@ -344,8 +344,32 @@
   window.addEventListener("yt-navigate-finish", () => {
     activeWatchSeconds = 0;
     hasAutoTriggered = false;
-    setTimeout(injectSaveButton, 800);
-    setTimeout(detectAndReportAccount, 1200);
-    setTimeout(checkHistoryPageBanner, 1500);
+    const vid = getVideoId();
+    if (vid) {
+      try {
+        chrome.runtime.sendMessage({
+          action: "auto_sync_video",
+          videoId: vid,
+          title: getVideoTitle(),
+          watched_at: new Date().toISOString()
+        });
+      } catch (e) {}
+    }
+    setTimeout(injectSaveButton, 600);
+    setTimeout(detectAndReportAccount, 1000);
+    setTimeout(checkHistoryPageBanner, 1200);
   });
+  
+  // Initial check on script load
+  const initialVid = getVideoId();
+  if (initialVid) {
+    try {
+      chrome.runtime.sendMessage({
+        action: "auto_sync_video",
+        videoId: initialVid,
+        title: getVideoTitle(),
+        watched_at: new Date().toISOString()
+      });
+    } catch (e) {}
+  }
 })();

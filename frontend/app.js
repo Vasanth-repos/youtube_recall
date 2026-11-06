@@ -40,6 +40,20 @@ document.addEventListener("DOMContentLoaded", () => {
   loadVideos();
   loadSettings();
   loadAccountStatus();
+
+  // Realtime auto-refresh when tab gains focus
+  window.addEventListener("focus", () => {
+    loadVideos();
+    loadStats();
+  });
+
+  // Background polling every 15s when active tab is visible
+  setInterval(() => {
+    if (document.visibilityState === "visible") {
+      loadVideos();
+      loadStats();
+    }
+  }, 15000);
 });
 
 // Navigation Tabs

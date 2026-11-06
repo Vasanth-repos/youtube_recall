@@ -1,21 +1,30 @@
 // YouTube Recall - Background Service Worker for Continuous Watch History Sync
 const SERVER_URL = "http://localhost:8000";
 const ALARM_NAME = "sync_youtube_history_alarm";
-const SYNC_INTERVAL_MINUTES = 15;
+const SYNC_INTERVAL_MINUTES = 2; // Auto-sync background history every 2 minutes
 
-// Initialize periodic sync alarm on extension load
+// In-memory debounce set to avoid duplicate rapid requests
+const recentlySyncedSet = new Set();
+
+// Initialize periodic sync alarm on extension load & startup
 chrome.runtime.onInstalled.addListener(() => {
   chrome.alarms.create(ALARM_NAME, {
     periodInMinutes: SYNC_INTERVAL_MINUTES,
-    delayInMinutes: 1
+    delayInMinutes: 0.1
   });
-  console.log("YouTube Recall background sync worker initialized.");
+  console.log("YouTube Recall background auto-sync worker initialized.");
+  // Immediate initial sync of recent watch history
+  syncYouTubeHistory(25).catch(() => {});
 });
 
-// Periodic sync alarm handler
+chrome.runtime.onStartup.addListener(() => {
+  syncYouTubeHistory(25).catch(() => {});
+});
+
+// Periodic sync alarm handler (every 2 minutes)
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === ALARM_NAME) {
-    syncYouTubeHistory(15).catch((err) => {
+    syncYouTubeHistory(20).catch((err) => {
       console.warn("Background auto-sync failed:", err);
     });
   }
@@ -23,6 +32,7 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 
 // Extract 11-char YouTube Video ID from URL
 function extractVideoId(url) {
+  if (!url) return null;
   try {
     const u = new URL(url);
     if (u.hostname.includes("youtube.com") && u.searchParams.has("v")) {
@@ -35,7 +45,73 @@ function extractVideoId(url) {
   return null;
 }
 
-// Synchronize YouTube watch history from Chrome's browsing history
+// Automatically sync an individual video into YouTube Recall
+async function autoSyncVideo(videoId, title, visitedTime) {
+  if (!videoId || recentlySyncedSet.has(videoId)) return;
+  recentlySyncedSet.add(videoId);
+
+  // Keep debounce cache bounded
+  if (recentlySyncedSet.size > 200) {
+    const first = recentlySyncedSet.values().next().value;
+    recentlySyncedSet.delete(first);
+  }
+
+  const cleanTitle = (title || "").replace(" - YouTube", "").trim();
+  const watchedAt = visitedTime ? new Date(visitedTime).toISOString() : new Date().toISOString();
+
+  try {
+    console.log(`[YouTube Recall] Auto-capturing watched video: ${videoId} ('${cleanTitle}')`);
+
+    const resp = await fetch(`${SERVER_URL}/api/videos/intake`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        video_url_or_id: videoId,
+        watch_time_seconds: 60,
+        watch_percent: 100,
+        force_process: true,
+        watched_at: watchedAt
+      })
+    });
+
+    if (resp.ok) {
+      console.log(`[YouTube Recall] ✓ Video ${videoId} auto-synced into smart transcript!`);
+      // Flash a green badge on extension icon to give subtle confirmation
+      if (chrome.action && chrome.action.setBadgeText) {
+        chrome.action.setBadgeText({ text: "✓" });
+        chrome.action.setBadgeBackgroundColor({ color: "#22c55e" });
+        setTimeout(() => {
+          chrome.action.setBadgeText({ text: "" });
+        }, 6000);
+      }
+    }
+  } catch (err) {
+    console.warn(`[YouTube Recall] Auto-sync failed for ${videoId}:`, err);
+  }
+}
+
+// 1. Instant trigger on Chrome browsing history visits (fires the instant any YouTube video is visited)
+chrome.history.onVisited.addListener((historyItem) => {
+  if (historyItem.url && (historyItem.url.includes("youtube.com/watch") || historyItem.url.includes("youtu.be/"))) {
+    const videoId = extractVideoId(historyItem.url);
+    if (videoId) {
+      autoSyncVideo(videoId, historyItem.title, historyItem.lastVisitTime);
+    }
+  }
+});
+
+// 2. Instant trigger on active tab URL updates / navigation
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+  const targetUrl = changeInfo.url || tab.url;
+  if (targetUrl && (targetUrl.includes("youtube.com/watch") || targetUrl.includes("youtu.be/"))) {
+    const videoId = extractVideoId(targetUrl);
+    if (videoId) {
+      autoSyncVideo(videoId, tab.title);
+    }
+  }
+});
+
+// Synchronize YouTube watch history from Chrome's browsing history in batch
 async function syncYouTubeHistory(maxResults = 25) {
   return new Promise((resolve, reject) => {
     // Look for YouTube watch URLs from the past 7 days
@@ -130,6 +206,13 @@ async function syncYouTubeHistory(maxResults = 25) {
 
 // Listen for messages from Content Scripts and Popup
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (request.action === "auto_sync_video") {
+    autoSyncVideo(request.videoId, request.title, request.watched_at)
+      .then(() => sendResponse({ success: true }))
+      .catch((err) => sendResponse({ success: false, error: err.message }));
+    return true;
+  }
+
   if (request.action === "manual_history_sync") {
     syncYouTubeHistory(request.maxCount || 30)
       .then((result) => sendResponse(result))
