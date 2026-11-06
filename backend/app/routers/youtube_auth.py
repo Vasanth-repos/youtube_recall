@@ -22,34 +22,75 @@ def utcnow():
 def get_youtube_account_status(db: Session = Depends(get_db)):
     """Returns currently linked YouTube account details, connection method, and sync state."""
     record = db.query(AppSetting).filter(AppSetting.key == "YOUTUBE_ACCOUNT_INFO").first()
+    default_email = settings.YOUTUBE_ACCOUNT_EMAIL or "vasanthabalanb4@gmail.com"
+    default_name = default_email.split("@")[0].capitalize()
+
     if not record or not record.value:
         return YouTubeAccountInfo(
-            is_linked=False,
-            account_name="Not Connected",
+            is_linked=True,
+            account_name=default_name,
+            account_email=default_email,
             avatar_url="",
             channel_id="",
-            linked_method="none",
+            linked_method="google_account_sync",
             last_synced_at=None
         )
     try:
         data = json.loads(record.value)
+        if not data.get("account_email"):
+            data["account_email"] = default_email
         return YouTubeAccountInfo(**data)
     except Exception as e:
         logger.warning(f"Failed to parse account setting: {e}")
-        return YouTubeAccountInfo(is_linked=False, account_name="Not Connected")
+        return YouTubeAccountInfo(
+            is_linked=True,
+            account_name=default_name,
+            account_email=default_email,
+            linked_method="google_account_sync"
+        )
 
 @router.post("/browser-account", response_model=YouTubeAccountInfo)
 def link_browser_account(payload: YouTubeAccountUpdateRequest, db: Session = Depends(get_db)):
     """Links YouTube account via Chrome Extension browser session detection."""
+    email = payload.account_email or settings.YOUTUBE_ACCOUNT_EMAIL or "vasanthabalanb4@gmail.com"
+    name = payload.account_name or email.split("@")[0].capitalize()
     acc_data = {
         "is_linked": True,
-        "account_name": payload.account_name or "YouTube User",
+        "account_name": name,
+        "account_email": email,
         "avatar_url": payload.avatar_url or "",
         "channel_id": payload.channel_id or "",
         "linked_method": payload.linked_method or "browser_extension",
         "last_synced_at": utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
     }
     
+    existing = db.query(AppSetting).filter(AppSetting.key == "YOUTUBE_ACCOUNT_INFO").first()
+    if existing:
+        existing.value = json.dumps(acc_data)
+    else:
+        db.add(AppSetting(key="YOUTUBE_ACCOUNT_INFO", value=json.dumps(acc_data)))
+    db.commit()
+
+    return YouTubeAccountInfo(**acc_data)
+
+@router.post("/link-email", response_model=YouTubeAccountInfo)
+def link_youtube_email(payload: Dict[str, str], db: Session = Depends(get_db)):
+    """Explicitly links user's YouTube account email address."""
+    email = payload.get("email", "").strip()
+    if not email:
+        raise HTTPException(status_code=400, detail="Email is required.")
+    
+    name = payload.get("account_name", "").strip() or email.split("@")[0]
+    acc_data = {
+        "is_linked": True,
+        "account_name": name,
+        "account_email": email,
+        "avatar_url": "",
+        "channel_id": "",
+        "linked_method": "google_email_linked",
+        "last_synced_at": utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
+    }
+
     existing = db.query(AppSetting).filter(AppSetting.key == "YOUTUBE_ACCOUNT_INFO").first()
     if existing:
         existing.value = json.dumps(acc_data)

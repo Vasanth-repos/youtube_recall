@@ -10,6 +10,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   const syncBtn = document.getElementById("sync-history-btn");
   const syncStatus = document.getElementById("sync-status");
   const accountNameEl = document.getElementById("account-name");
+  const accountEmailEl = document.getElementById("account-email");
   const accountAvatarImg = document.getElementById("account-avatar");
   const accountAvatarPl = document.getElementById("account-avatar-placeholder");
   const accountStatusLabel = document.getElementById("account-status-label");
@@ -33,14 +34,15 @@ document.addEventListener("DOMContentLoaded", async () => {
   // Load account info from storage or server
   chrome.storage.local.get(["yt_account_info", "last_sync_stats"], (res) => {
     const acc = res.yt_account_info;
-    if (acc && acc.account_name) {
-      accountNameEl.textContent = acc.account_name;
-      if (acc.avatar_url) {
+    if (acc) {
+      if (acc.account_name && accountNameEl) accountNameEl.textContent = acc.account_name;
+      if (acc.account_email && accountEmailEl) accountEmailEl.textContent = acc.account_email;
+      if (acc.avatar_url && accountAvatarImg) {
         accountAvatarImg.src = acc.avatar_url;
         accountAvatarImg.style.display = "block";
-        accountAvatarPl.style.display = "none";
+        if (accountAvatarPl) accountAvatarPl.style.display = "none";
       }
-      accountStatusLabel.textContent = "Account Linked & Auto-Syncing";
+      if (accountStatusLabel) accountStatusLabel.textContent = "Account Linked & Auto-Syncing";
     }
 
     if (res.last_sync_stats) {
@@ -54,12 +56,13 @@ document.addEventListener("DOMContentLoaded", async () => {
     fetch(`${SERVER_URL}/api/youtube/status`)
       .then((r) => r.json())
       .then((data) => {
-        if (data.is_linked && data.account_name) {
-          accountNameEl.textContent = data.account_name;
-          if (data.avatar_url) {
+        if (data.is_linked) {
+          if (data.account_name && accountNameEl) accountNameEl.textContent = data.account_name;
+          if (data.account_email && accountEmailEl) accountEmailEl.textContent = data.account_email;
+          if (data.avatar_url && accountAvatarImg) {
             accountAvatarImg.src = data.avatar_url;
             accountAvatarImg.style.display = "block";
-            accountAvatarPl.style.display = "none";
+            if (accountAvatarPl) accountAvatarPl.style.display = "none";
           }
         }
       })

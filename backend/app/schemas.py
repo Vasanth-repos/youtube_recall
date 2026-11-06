@@ -106,6 +106,7 @@ class SystemStats(BaseModel):
 class YouTubeAccountInfo(BaseModel):
     is_linked: bool = False
     account_name: Optional[str] = "Not Connected"
+    account_email: Optional[str] = ""
     avatar_url: Optional[str] = ""
     channel_id: Optional[str] = ""
     linked_method: Optional[str] = "none" # "browser_extension" or "google_oauth"
@@ -113,6 +114,7 @@ class YouTubeAccountInfo(BaseModel):
 
 class YouTubeAccountUpdateRequest(BaseModel):
     account_name: str
+    account_email: Optional[str] = ""
     avatar_url: Optional[str] = ""
     channel_id: Optional[str] = ""
     linked_method: Optional[str] = "browser_extension"
@@ -126,6 +128,7 @@ class YouTubeHistorySyncItem(BaseModel):
 class YouTubeHistorySyncRequest(BaseModel):
     items: List[YouTubeHistorySyncItem]
     account_name: Optional[str] = ""
+    account_email: Optional[str] = ""
     avatar_url: Optional[str] = ""
 
 class YouTubeHistorySyncResponse(BaseModel):

@@ -153,10 +153,13 @@ def sync_youtube_history(payload: YouTubeHistorySyncRequest, db: Session = Depen
     Automatically filters duplicates and distills transcripts for new videos.
     """
     # 1. Update linked account metadata if provided
-    if payload.account_name:
+    if payload.account_name or payload.account_email:
+        email = payload.account_email or settings.YOUTUBE_ACCOUNT_EMAIL or "vasanthabalanb4@gmail.com"
+        name = payload.account_name or email.split("@")[0].capitalize()
         acc_data = {
             "is_linked": True,
-            "account_name": payload.account_name,
+            "account_name": name,
+            "account_email": email,
             "avatar_url": payload.avatar_url or "",
             "channel_id": "",
             "linked_method": "browser_extension",

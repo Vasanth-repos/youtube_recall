@@ -95,7 +95,8 @@ async function syncYouTubeHistory(maxResults = 25) {
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
                 items: itemsToSync,
-                account_name: account.account_name || "YouTube Account",
+                account_name: account.account_name || "Vasanthabalan",
+                account_email: account.account_email || "vasanthabalanb4@gmail.com",
                 avatar_url: account.avatar_url || ""
               })
             });
@@ -143,7 +144,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          account_name: request.account_info.account_name || "Active YouTube Session",
+          account_name: request.account_info.account_name || "Vasanthabalan",
+          account_email: request.account_info.account_email || "vasanthabalanb4@gmail.com",
           avatar_url: request.account_info.avatar_url || "",
           channel_id: request.account_info.channel_id || "",
           linked_method: "browser_extension"

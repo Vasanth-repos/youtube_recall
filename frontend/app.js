@@ -531,6 +531,7 @@ async function loadAccountStatus() {
     const navStatus = document.getElementById("nav-account-status");
     const navName = document.getElementById("nav-account-name");
     const settingsName = document.getElementById("settings-account-name");
+    const settingsEmail = document.getElementById("settings-account-email");
     const settingsBadge = document.getElementById("settings-account-badge");
     const settingsSyncStatus = document.getElementById("settings-sync-status");
     const settingsAvatar = document.getElementById("settings-avatar");
@@ -538,9 +539,10 @@ async function loadAccountStatus() {
 
     if (data.is_linked) {
       if (navStatus) navStatus.classList.remove("hidden");
-      if (navName) navName.textContent = data.account_name || "YouTube Linked";
+      if (navName) navName.textContent = data.account_email || data.account_name || "YouTube Linked";
       if (settingsName) settingsName.textContent = data.account_name || "YouTube Account";
-      if (settingsBadge) settingsBadge.textContent = data.linked_method === "google_oauth" ? "Google OAuth Connected" : "Session Linked";
+      if (settingsEmail) settingsEmail.textContent = data.account_email || "vasanthabalanb4@gmail.com";
+      if (settingsBadge) settingsBadge.textContent = data.linked_method === "google_oauth" ? "Google OAuth Connected" : "Account Synced";
       if (settingsSyncStatus) {
         settingsSyncStatus.textContent = data.last_synced_at ? `Last synced: ${data.last_synced_at}` : "Continuous background capture active";
       }
