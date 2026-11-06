@@ -103,3 +103,35 @@ class SystemStats(BaseModel):
     cards_mastered: int
     total_reviews_completed: int
 
+class YouTubeAccountInfo(BaseModel):
+    is_linked: bool = False
+    account_name: Optional[str] = "Not Connected"
+    avatar_url: Optional[str] = ""
+    channel_id: Optional[str] = ""
+    linked_method: Optional[str] = "none" # "browser_extension" or "google_oauth"
+    last_synced_at: Optional[str] = None
+
+class YouTubeAccountUpdateRequest(BaseModel):
+    account_name: str
+    avatar_url: Optional[str] = ""
+    channel_id: Optional[str] = ""
+    linked_method: Optional[str] = "browser_extension"
+
+class YouTubeHistorySyncItem(BaseModel):
+    video_url_or_id: str
+    title: Optional[str] = ""
+    watched_at: Optional[str] = ""
+    watch_time_seconds: Optional[int] = 120
+
+class YouTubeHistorySyncRequest(BaseModel):
+    items: List[YouTubeHistorySyncItem]
+    account_name: Optional[str] = ""
+    avatar_url: Optional[str] = ""
+
+class YouTubeHistorySyncResponse(BaseModel):
+    total_received: int
+    newly_synced: int
+    already_synced: int
+    synced_titles: List[str] = []
+    message: str
+

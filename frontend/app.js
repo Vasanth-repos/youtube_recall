@@ -9,6 +9,7 @@ document.addEventListener("DOMContentLoaded", () => {
   loadStats();
   loadVideos();
   loadSettings();
+  loadAccountStatus();
 });
 
 // Navigation Tabs
@@ -517,5 +518,65 @@ async function saveSettings() {
     }
   } catch (e) {
     alert("Error saving settings: " + e.message);
+  }
+}
+
+// YouTube Account Status & Sync
+async function loadAccountStatus() {
+  try {
+    const res = await fetch("/api/youtube/status");
+    if (!res.ok) return;
+    const data = await res.json();
+
+    const navStatus = document.getElementById("nav-account-status");
+    const navName = document.getElementById("nav-account-name");
+    const settingsName = document.getElementById("settings-account-name");
+    const settingsBadge = document.getElementById("settings-account-badge");
+    const settingsSyncStatus = document.getElementById("settings-sync-status");
+    const settingsAvatar = document.getElementById("settings-avatar");
+    const settingsPlaceholder = document.getElementById("settings-avatar-placeholder");
+
+    if (data.is_linked) {
+      if (navStatus) navStatus.classList.remove("hidden");
+      if (navName) navName.textContent = data.account_name || "YouTube Linked";
+      if (settingsName) settingsName.textContent = data.account_name || "YouTube Account";
+      if (settingsBadge) settingsBadge.textContent = data.linked_method === "google_oauth" ? "Google OAuth Connected" : "Session Linked";
+      if (settingsSyncStatus) {
+        settingsSyncStatus.textContent = data.last_synced_at ? `Last synced: ${data.last_synced_at}` : "Continuous background capture active";
+      }
+      if (data.avatar_url && settingsAvatar && settingsPlaceholder) {
+        settingsAvatar.src = data.avatar_url;
+        settingsAvatar.classList.remove("hidden");
+        settingsPlaceholder.classList.add("hidden");
+      }
+    }
+  } catch (e) {
+    console.warn("Could not load YouTube account status:", e);
+  }
+}
+
+async function syncYouTubeHistoryFromUI() {
+  const btn = document.getElementById("sync-history-ui-btn");
+  const text = document.getElementById("sync-history-ui-text");
+  const original = text ? text.textContent : "Sync History";
+  if (text) text.textContent = "Syncing...";
+  if (btn) btn.disabled = true;
+
+  try {
+    await loadVideos();
+    await loadStats();
+    await loadAccountStatus();
+
+    if (text) text.textContent = "✓ Synced!";
+    setTimeout(() => {
+      if (text) text.textContent = original;
+      if (btn) btn.disabled = false;
+    }, 2000);
+  } catch (e) {
+    if (text) text.textContent = "Sync failed";
+    setTimeout(() => {
+      if (text) text.textContent = original;
+      if (btn) btn.disabled = false;
+    }, 2500);
   }
 }

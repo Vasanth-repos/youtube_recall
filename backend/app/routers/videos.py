@@ -1,4 +1,5 @@
 import logging
+import json
 from typing import List, Optional
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
@@ -6,8 +7,13 @@ from sqlalchemy.orm import Session
 from sqlalchemy import desc
 
 from backend.app.database import get_db
-from backend.app.models import Video, Flashcard
-from backend.app.schemas import VideoIntakeRequest, VideoResponse
+from backend.app.models import Video, Flashcard, AppSetting
+from backend.app.schemas import (
+    VideoIntakeRequest,
+    VideoResponse,
+    YouTubeHistorySyncRequest,
+    YouTubeHistorySyncResponse
+)
 from backend.app.services.youtube_service import YouTubeService
 from backend.app.services.classifier_service import ClassifierService
 from backend.app.services.ai_service import AIService
@@ -139,6 +145,65 @@ def process_video_pipeline(db: Session, video_req: VideoIntakeRequest) -> Video:
 def intake_video(payload: VideoIntakeRequest, db: Session = Depends(get_db)):
     """Receives YouTube video ID/URL, validates, transcribes, classifies, and synthesizes study material."""
     return process_video_pipeline(db, payload)
+
+@router.post("/sync-history", response_model=YouTubeHistorySyncResponse)
+def sync_youtube_history(payload: YouTubeHistorySyncRequest, db: Session = Depends(get_db)):
+    """
+    Batch synchronizes YouTube watch history items from linked account / browser extension.
+    Automatically filters duplicates and distills transcripts for new videos.
+    """
+    # 1. Update linked account metadata if provided
+    if payload.account_name:
+        acc_data = {
+            "is_linked": True,
+            "account_name": payload.account_name,
+            "avatar_url": payload.avatar_url or "",
+            "channel_id": "",
+            "linked_method": "browser_extension",
+            "last_synced_at": utcnow().isoformat()
+        }
+        existing = db.query(AppSetting).filter(AppSetting.key == "YOUTUBE_ACCOUNT_INFO").first()
+        if existing:
+            existing.value = json.dumps(acc_data)
+        else:
+            db.add(AppSetting(key="YOUTUBE_ACCOUNT_INFO", value=json.dumps(acc_data)))
+        db.commit()
+
+    total_received = len(payload.items)
+    newly_synced = 0
+    already_synced = 0
+    synced_titles = []
+
+    for item in payload.items:
+        raw_id = YouTubeService.extract_video_id(item.video_url_or_id)
+        if not raw_id:
+            continue
+
+        existing = db.query(Video).filter(Video.video_id == raw_id).first()
+        if existing and existing.status == "PROCESSED":
+            already_synced += 1
+            continue
+
+        try:
+            req = VideoIntakeRequest(
+                video_url_or_id=raw_id,
+                watch_time_seconds=item.watch_time_seconds or 180,
+                watch_percent=100.0,
+                force_process=True
+            )
+            vid = process_video_pipeline(db, req)
+            newly_synced += 1
+            synced_titles.append(vid.title)
+        except Exception as e:
+            logger.warning(f"Could not auto-sync video {raw_id}: {e}")
+
+    return YouTubeHistorySyncResponse(
+        total_received=total_received,
+        newly_synced=newly_synced,
+        already_synced=already_synced,
+        synced_titles=synced_titles,
+        message=f"Synced {newly_synced} new video(s) from your YouTube account history ({already_synced} already saved)."
+    )
 
 @router.get("", response_model=List[VideoResponse])
 def list_videos(

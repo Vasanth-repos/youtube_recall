@@ -23,6 +23,11 @@ class AppConfig:
     OLLAMA_BASE_URL: str = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
     OLLAMA_MODEL: str = os.getenv("OLLAMA_MODEL", "llama3")
 
+    # YouTube / Google Account Linking
+    GOOGLE_CLIENT_ID: str = os.getenv("GOOGLE_CLIENT_ID", "")
+    GOOGLE_CLIENT_SECRET: str = os.getenv("GOOGLE_CLIENT_SECRET", "")
+    GOOGLE_REDIRECT_URI: str = os.getenv("GOOGLE_REDIRECT_URI", "http://localhost:8000/api/youtube/oauth-callback")
+
     # Spaced Repetition Schedule (Days from PDF specification: 0, 1, 3, 7, 15, 30, 60, 90, 180)
     SPACED_SCHEDULE_DAYS: List[int] = [0, 1, 3, 7, 15, 30, 60, 90, 180]
 

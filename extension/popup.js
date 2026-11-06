@@ -7,8 +7,14 @@ document.addEventListener("DOMContentLoaded", async () => {
   const ytTitle = document.getElementById("yt-title");
   const autoStatusText = document.getElementById("auto-status-text");
   const mainBtn = document.getElementById("main-btn");
+  const syncBtn = document.getElementById("sync-history-btn");
+  const syncStatus = document.getElementById("sync-status");
+  const accountNameEl = document.getElementById("account-name");
+  const accountAvatarImg = document.getElementById("account-avatar");
+  const accountAvatarPl = document.getElementById("account-avatar-placeholder");
+  const accountStatusLabel = document.getElementById("account-status-label");
 
-  // 1. Check server health
+  // 1. Check server health & linked account status
   let isServerOnline = false;
   try {
     const res = await fetch(`${SERVER_URL}/api/health`, { method: "GET" });
@@ -24,7 +30,62 @@ document.addEventListener("DOMContentLoaded", async () => {
     serverStatus.className = "status-pill offline";
   }
 
-  // 2. Query active YouTube tab
+  // Load account info from storage or server
+  chrome.storage.local.get(["yt_account_info", "last_sync_stats"], (res) => {
+    const acc = res.yt_account_info;
+    if (acc && acc.account_name) {
+      accountNameEl.textContent = acc.account_name;
+      if (acc.avatar_url) {
+        accountAvatarImg.src = acc.avatar_url;
+        accountAvatarImg.style.display = "block";
+        accountAvatarPl.style.display = "none";
+      }
+      accountStatusLabel.textContent = "Account Linked & Auto-Syncing";
+    }
+
+    if (res.last_sync_stats) {
+      const stats = res.last_sync_stats;
+      syncStatus.style.display = "block";
+      syncStatus.textContent = `Last sync: ${stats.newly_synced || 0} new, ${stats.already_synced || 0} existing videos.`;
+    }
+  });
+
+  if (isServerOnline) {
+    fetch(`${SERVER_URL}/api/youtube/status`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.is_linked && data.account_name) {
+          accountNameEl.textContent = data.account_name;
+          if (data.avatar_url) {
+            accountAvatarImg.src = data.avatar_url;
+            accountAvatarImg.style.display = "block";
+            accountAvatarPl.style.display = "none";
+          }
+        }
+      })
+      .catch(() => {});
+  }
+
+  // 2. Sync YouTube Watch History Button Click
+  syncBtn.addEventListener("click", () => {
+    syncBtn.disabled = true;
+    syncBtn.innerHTML = "<span>⏳ Syncing Watch History...</span>";
+    syncStatus.style.display = "block";
+    syncStatus.textContent = "Fetching videos from your YouTube watch history...";
+
+    chrome.runtime.sendMessage({ action: "manual_history_sync", maxCount: 30 }, (res) => {
+      syncBtn.disabled = false;
+      syncBtn.innerHTML = "<span>⚡ Sync YouTube Watch History</span>";
+
+      if (res && res.success) {
+        syncStatus.innerHTML = `<span style="color: #4ade80; font-weight: 600;">✓ Synced ${res.newly_synced} new video(s)!</span> (${res.already_synced} already in library)`;
+      } else {
+        syncStatus.innerHTML = `<span style="color: #f87171;">⚠️ Sync failed: ${res ? res.error : "Server offline"}</span>`;
+      }
+    });
+  });
+
+  // 3. Query active YouTube tab
   chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
     const activeTab = tabs[0];
     if (!activeTab || !activeTab.url || !activeTab.url.includes("youtube.com/watch")) {
@@ -93,7 +154,6 @@ document.addEventListener("DOMContentLoaded", async () => {
           autoStatusText.textContent = "Transcribing in background...";
 
           try {
-            // Try content script trigger first
             chrome.tabs.sendMessage(activeTab.id, { action: "manual_trigger" }, (res) => {
               if (chrome.runtime.lastError || !res) {
                 // Direct fallback API call

@@ -6,7 +6,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
 from backend.app.database import init_db
-from backend.app.routers import videos, flashcards, export, settings
+from backend.app.routers import videos, flashcards, export, settings, youtube_auth
 from backend.app.config import settings as app_settings
 
 # Initialize DB tables
@@ -32,6 +32,7 @@ app.include_router(videos.router)
 app.include_router(flashcards.router)
 app.include_router(export.router)
 app.include_router(settings.router)
+app.include_router(youtube_auth.router)
 
 @app.get("/api/health")
 def health_check():

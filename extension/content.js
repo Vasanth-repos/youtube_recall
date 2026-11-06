@@ -249,13 +249,102 @@
     }
   });
 
+  // Detect Logged-In YouTube Account Details
+  function detectAndReportAccount() {
+    const avatarImg = document.querySelector("#avatar-btn yt-img-shadow img") ||
+                      document.querySelector("button#avatar-btn img") ||
+                      document.querySelector("#avatar-btn #img");
+    const avatarUrl = avatarImg ? avatarImg.src : "";
+
+    const avatarBtn = document.querySelector("#avatar-btn");
+    const accountLabel = avatarBtn ? (avatarBtn.getAttribute("aria-label") || "") : "";
+    let accountName = accountLabel.replace(/Account picture for\s*/i, "").trim();
+
+    if (!accountName && avatarImg && avatarImg.alt) {
+      accountName = avatarImg.alt.replace(/Account picture for\s*/i, "").trim();
+    }
+
+    if (avatarUrl || accountName) {
+      chrome.runtime.sendMessage({
+        action: "update_account_info",
+        account_info: {
+          account_name: accountName || "YouTube User",
+          avatar_url: avatarUrl,
+          channel_id: ""
+        }
+      });
+    }
+  }
+
+  // Inject History Page Banner on https://www.youtube.com/feed/history
+  function checkHistoryPageBanner() {
+    if (!window.location.pathname.includes("/feed/history")) return;
+    if (document.getElementById("yt-recall-history-banner")) return;
+
+    const target = document.querySelector("ytd-browse[page-subtype='history'] #contents") ||
+                   document.querySelector("#contents.ytd-section-list-renderer") ||
+                   document.querySelector("ytd-section-list-renderer");
+
+    if (!target) return;
+
+    const banner = document.createElement("div");
+    banner.id = "yt-recall-history-banner";
+    banner.className = "yt-recall-history-banner";
+    banner.innerHTML = `
+      <div>
+        <div class="yt-recall-history-title">
+          <span>✨ YouTube Recall</span>
+          <span style="font-size: 11px; font-weight: 500; color: #4ade80; background: rgba(34, 197, 94, 0.15); padding: 2px 8px; border-radius: 12px; border: 1px solid rgba(34, 197, 94, 0.3);">Account Watch History</span>
+        </div>
+        <div class="yt-recall-history-desc">
+          Automatically fetch and transcribe recently watched videos from your YouTube account.
+        </div>
+      </div>
+      <button id="yt-recall-sync-history-btn" class="yt-recall-btn" style="white-space: nowrap; margin-left: 0;">
+        <span>⚡ Sync History to Recall</span>
+      </button>
+    `;
+
+    target.parentNode.insertBefore(banner, target);
+
+    const btn = document.getElementById("yt-recall-sync-history-btn");
+    if (btn) {
+      btn.addEventListener("click", () => {
+        btn.disabled = true;
+        btn.innerHTML = "<span>⏳ Syncing History...</span>";
+        chrome.runtime.sendMessage({ action: "manual_history_sync", maxCount: 40 }, (res) => {
+          btn.disabled = false;
+          if (res && res.success) {
+            btn.innerHTML = `<span>✓ Synced ${res.newly_synced} New Videos!</span>`;
+            setTimeout(() => {
+              window.open(SERVER_URL, "_blank");
+            }, 1200);
+          } else {
+            btn.innerHTML = "<span>⚠️ Sync Failed</span>";
+            setTimeout(() => {
+              btn.innerHTML = "<span>⚡ Sync History to Recall</span>";
+            }, 3000);
+          }
+        });
+      });
+    }
+  }
+
   // Track playback every second
   setInterval(handlePlaybackTracking, 1000);
   // Re-check button injection on YouTube SPA navigation
   setInterval(injectSaveButton, 2000);
+  // Re-check account detection and history page banner
+  setInterval(() => {
+    detectAndReportAccount();
+    checkHistoryPageBanner();
+  }, 3000);
+
   window.addEventListener("yt-navigate-finish", () => {
     activeWatchSeconds = 0;
     hasAutoTriggered = false;
     setTimeout(injectSaveButton, 800);
+    setTimeout(detectAndReportAccount, 1200);
+    setTimeout(checkHistoryPageBanner, 1500);
   });
 })();

@@ -56,6 +56,10 @@
 
       <!-- Nav Tabs -->
       <nav class="flex items-center gap-1.5">
+        <div id="nav-account-status" onclick="switchTab('settings')" class="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-dark-850 border border-dark-700/80 text-[11px] text-slate-300 cursor-pointer hover:border-slate-500 transition-colors mr-1" title="Linked YouTube Account">
+          <span id="nav-account-dot" class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+          <span id="nav-account-name">YouTube Linked</span>
+        </div>
         <button id="nav-library-btn" onclick="switchTab('library')" class="nav-tab active flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-colors">
           <i data-lucide="library" class="w-4 h-4"></i>
           <span>Library</span>
@@ -93,6 +97,10 @@
           <button onclick="filterCategory('Tech')" class="category-pill px-3 py-1.5 rounded-lg font-medium whitespace-nowrap bg-dark-850 text-slate-300 border border-dark-700/70 hover:border-slate-500 transition-colors">Tech & Coding</button>
           <button onclick="filterCategory('Science')" class="category-pill px-3 py-1.5 rounded-lg font-medium whitespace-nowrap bg-dark-850 text-slate-300 border border-dark-700/70 hover:border-slate-500 transition-colors">Science & Math</button>
           <button onclick="filterCategory('Growth')" class="category-pill px-3 py-1.5 rounded-lg font-medium whitespace-nowrap bg-dark-850 text-slate-300 border border-dark-700/70 hover:border-slate-500 transition-colors">Productivity</button>
+          <button onclick="syncYouTubeHistoryFromUI()" id="sync-history-ui-btn" title="Sync recent videos from your linked YouTube session" class="ml-1 px-3 py-1.5 rounded-lg bg-dark-850 hover:bg-dark-800 text-brand-400 border border-brand-500/30 hover:border-brand-500/60 font-semibold whitespace-nowrap flex items-center gap-1.5 transition-colors">
+            <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+            <span id="sync-history-ui-text">Sync History</span>
+          </button>
         </div>
       </div>
 
@@ -241,6 +249,36 @@
       </div>
 
       <div class="space-y-4">
+        <!-- Linked YouTube Account -->
+        <div class="bg-dark-900 border border-dark-700/80 rounded-xl p-5 space-y-3.5">
+          <div class="flex items-center justify-between">
+            <h3 class="text-sm font-semibold text-white flex items-center gap-2">
+              <i data-lucide="youtube" class="w-4 h-4 text-red-500"></i>
+              Linked YouTube Account & Watch History
+            </h3>
+            <span id="settings-account-badge" class="px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+              Session Linked
+            </span>
+          </div>
+
+          <div class="flex items-center gap-3 p-3 rounded-lg bg-dark-950 border border-dark-800">
+            <div id="settings-avatar-placeholder" class="w-10 h-10 rounded-full bg-dark-800 flex items-center justify-center text-lg">👤</div>
+            <img id="settings-avatar" class="hidden w-10 h-10 rounded-full object-cover border border-dark-700" alt="Avatar">
+            <div class="flex-1 min-w-0">
+              <div id="settings-account-name" class="font-bold text-sm text-white truncate">Active YouTube Account</div>
+              <div id="settings-sync-status" class="text-xs text-slate-400">Continuous background capture active via Chrome Extension</div>
+            </div>
+            <button onclick="syncYouTubeHistoryFromUI()" class="px-3 py-1.5 rounded-lg bg-brand-500/10 hover:bg-brand-500/20 text-brand-400 border border-brand-500/30 text-xs font-semibold flex items-center gap-1 transition-colors whitespace-nowrap">
+              <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+              <span>Sync History</span>
+            </button>
+          </div>
+
+          <p class="text-[11px] text-slate-400 leading-relaxed">
+            Your YouTube watch activity is automatically synchronized. As you browse and watch videos on YouTube, Recall automatically captures the video and prepares clean, crisp notes and flashcards.
+          </p>
+        </div>
+
         <!-- AI Engine -->
         <div class="bg-dark-900 border border-dark-700/80 rounded-xl p-5 space-y-3">
           <h3 class="text-sm font-semibold text-white">AI Distillation Engine</h3>

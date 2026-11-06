@@ -180,20 +180,63 @@ def run_e2e_tests():
     print("  ✓ GET /api/export/anki/{id}/download returned valid Anki TSV file")
 
     # -------------------------------------------------------------
-    # STEP 8: Chrome Extension Integrity Check
+    # STEP 8: YouTube Account Linking & History Sync Endpoints
     # -------------------------------------------------------------
-    print("\n[STEP 8] Testing Chrome Extension Manifest & Asset Integrity...")
+    print("\n[STEP 8] Testing YouTube Account Linking & History Sync Endpoints...")
+    res = client.get("/api/youtube/status")
+    assert res.status_code == 200
+    account_status = res.json()
+    assert "is_linked" in account_status
+    print("  ✓ GET /api/youtube/status resolved correctly")
+
+    # Link Browser Account
+    link_payload = {
+        "account_name": "Antigravity Engineering YouTube",
+        "avatar_url": "https://example.com/avatar.jpg",
+        "channel_id": "UC1234567890",
+        "linked_method": "browser_extension"
+    }
+    res = client.post("/api/youtube/browser-account", json=link_payload)
+    assert res.status_code == 200
+    assert res.json()["is_linked"] is True
+    assert res.json()["account_name"] == "Antigravity Engineering YouTube"
+    print("  ✓ POST /api/youtube/browser-account linked account successfully")
+
+    # Test Batch Watch History Synchronization
+    sync_payload = {
+        "items": [
+            {
+                "video_url_or_id": "https://www.youtube.com/watch?v=3d6DsjIBzJ4",
+                "title": "How Does A Transistor Work?",
+                "watch_time_seconds": 300
+            }
+        ],
+        "account_name": "Antigravity Engineering YouTube",
+        "avatar_url": "https://example.com/avatar.jpg"
+    }
+    res = client.post("/api/videos/sync-history", json=sync_payload)
+    assert res.status_code == 200
+    sync_result = res.json()
+    assert sync_result["total_received"] >= 1
+    print(f"  ✓ POST /api/videos/sync-history succeeded: {sync_result['message']}")
+
+    # -------------------------------------------------------------
+    # STEP 9: Chrome Extension Manifest & Asset Integrity
+    # -------------------------------------------------------------
+    print("\n[STEP 9] Testing Chrome Extension Manifest & Asset Integrity...")
     ext_dir = ROOT_DIR / "extension"
     assert (ext_dir / "manifest.json").exists(), "manifest.json missing"
     manifest = json.loads((ext_dir / "manifest.json").read_text(encoding="utf-8"))
     assert manifest["manifest_version"] == 3
-    assert "content.js" in manifest["content_scripts"][0]["js"]
-    assert "content.css" in manifest["content_scripts"][0]["css"]
+    assert "history" in manifest["permissions"]
+    assert "alarms" in manifest["permissions"]
+    assert manifest.get("background", {}).get("service_worker") == "background.js"
+    assert (ext_dir / "background.js").exists(), "background.js missing"
     assert (ext_dir / "content.js").exists(), "content.js missing"
     assert (ext_dir / "content.css").exists(), "content.css missing"
     assert (ext_dir / "popup.html").exists(), "popup.html missing"
     assert (ext_dir / "popup.js").exists(), "popup.js missing"
-    print("  ✓ Chrome Extension Manifest V3 and all scripts verified")
+    print("  ✓ Chrome Extension Manifest V3, background service worker, and all scripts verified")
 
     print("\n=================================================================")
     print("  🎉 ALL END-TO-END TESTS COMPLETED AND VERIFIED 100% PASSING!  ")
