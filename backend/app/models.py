@@ -29,6 +29,7 @@ class Video(Base):
     summary_bullets_json = Column(Text, default="[]")  # 3-bullet summary
     key_concepts_json = Column(Text, default="[]")     # List of concepts
     topic_notes_json = Column(Text, default="[]")      # Timestamped sections
+    smart_transcript_json = Column(Text, default="[]") # AI-powered crisp sectioned transcript
     final_summary = Column(Text, default="")           # High-level synthesis
     transcript_clean = Column(Text, default="")        # Parsed transcript text
     tags_json = Column(Text, default="[]")
@@ -37,6 +38,17 @@ class Video(Base):
     updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
 
     flashcards = relationship("Flashcard", back_populates="video", cascade="all, delete-orphan")
+
+    @property
+    def smart_transcript(self):
+        try:
+            return json.loads(self.smart_transcript_json or "[]")
+        except Exception:
+            return []
+
+    @smart_transcript.setter
+    def smart_transcript(self, value):
+        self.smart_transcript_json = json.dumps(value or [])
 
     @property
     def summary_bullets(self):
@@ -129,3 +141,4 @@ class AppSetting(Base):
     value = Column(Text, nullable=False)
     description = Column(String(512), default="")
     updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
+

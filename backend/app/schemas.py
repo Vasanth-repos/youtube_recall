@@ -55,7 +55,9 @@ class VideoResponse(BaseModel):
     summary_bullets: List[str] = []
     key_concepts: List[str] = []
     topic_notes: List[Dict[str, Any]] = []
+    smart_transcript: List[Dict[str, Any]] = []
     final_summary: str
+    transcript_clean: Optional[str] = ""
     tags: List[str] = []
     flashcards: List[FlashcardResponse] = []
     created_at: datetime
@@ -100,3 +102,4 @@ class SystemStats(BaseModel):
     cards_due_today: int
     cards_mastered: int
     total_reviews_completed: int
+

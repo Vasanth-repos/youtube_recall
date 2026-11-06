@@ -1,8 +1,6 @@
-// YouTube Recall Frontend Application Logic
+// YouTube Recall - AI Smart Transcript Application Logic
 
 let allVideos = [];
-let dueFlashcards = [];
-let currentCardIndex = 0;
 let currentViewingVideo = null;
 let activeCategory = "";
 
@@ -10,14 +8,12 @@ document.addEventListener("DOMContentLoaded", () => {
   if (window.lucide) lucide.createIcons();
   loadStats();
   loadVideos();
-  loadDueCards();
   loadSettings();
-  setupKeyboardShortcuts();
 });
 
 // Navigation Tabs
 function switchTab(tab) {
-  const tabs = ["library", "review", "settings"];
+  const tabs = ["library", "reader", "settings"];
   tabs.forEach(t => {
     const el = document.getElementById(`tab-${t}`);
     const btn = document.getElementById(`nav-${t}-btn`);
@@ -30,8 +26,8 @@ function switchTab(tab) {
     }
   });
 
-  if (tab === "review") {
-    loadDueCards();
+  if (tab === "reader" && currentViewingVideo) {
+    renderReaderView(currentViewingVideo);
   } else if (tab === "library") {
     loadVideos();
   }
@@ -40,22 +36,26 @@ function switchTab(tab) {
 // Fetch & Update Stats
 async function loadStats() {
   try {
-    const res = await fetch("/api/flashcards/stats");
+    const res = await fetch("/api/videos");
     if (!res.ok) return;
-    const stats = await res.json();
-    document.getElementById("stat-videos").textContent = stats.processed_videos;
-    document.getElementById("stat-cards").textContent = stats.total_flashcards;
-    document.getElementById("stat-due").textContent = stats.cards_due_today;
-    document.getElementById("stat-mastered").textContent = stats.cards_mastered;
-    document.getElementById("stat-reviews").textContent = stats.total_reviews_completed;
+    const vids = await res.json();
+    
+    let totalSections = 0;
+    let totalPoints = 0;
 
-    const dueBadge = document.getElementById("due-badge");
-    if (stats.cards_due_today > 0) {
-      dueBadge.textContent = stats.cards_due_today;
-      dueBadge.classList.remove("hidden");
-    } else {
-      dueBadge.classList.add("hidden");
-    }
+    vids.forEach(v => {
+      const sections = v.smart_transcript || v.topic_notes || [];
+      totalSections += sections.length;
+      sections.forEach(s => {
+        const pts = s.crisp_points || s.takeaways || [];
+        totalPoints += pts.length;
+      });
+      totalPoints += (v.summary_bullets || []).length;
+    });
+
+    document.getElementById("stat-videos").textContent = vids.length;
+    document.getElementById("stat-sections").textContent = totalSections;
+    document.getElementById("stat-points").textContent = totalPoints;
   } catch (e) {
     console.error("Failed to load stats:", e);
   }
@@ -69,6 +69,12 @@ async function loadVideos() {
     allVideos = await res.json();
     renderVideosGrid();
     loadStats();
+
+    // Auto-select first video into Reader if none selected
+    if (!currentViewingVideo && allVideos.length > 0) {
+      currentViewingVideo = allVideos[0];
+      document.getElementById("active-video-dot").classList.remove("hidden");
+    }
   } catch (e) {
     console.error("Failed to load videos:", e);
   }
@@ -94,14 +100,14 @@ function renderVideosGrid() {
   empty.classList.add("hidden");
   grid.innerHTML = filtered.map(v => {
     const durationMin = Math.floor(v.duration_seconds / 60);
-    const cardCount = v.flashcards ? v.flashcards.length : 0;
+    const sections = v.smart_transcript || v.topic_notes || [];
     const bulletsCount = v.summary_bullets ? v.summary_bullets.length : 0;
 
     return `
       <div class="bg-dark-800 border border-dark-700/80 rounded-xl overflow-hidden shadow-lg hover:border-slate-500 transition-all flex flex-col justify-between group">
         <div>
           <!-- Thumbnail & duration pill -->
-          <div class="relative aspect-video bg-dark-900 overflow-hidden cursor-pointer" onclick="openVideoModal('${v.video_id}')">
+          <div class="relative aspect-video bg-dark-900 overflow-hidden cursor-pointer" onclick="openReaderForVideo('${v.video_id}')">
             <img src="${v.thumbnail_url || 'https://img.youtube.com/vi/' + v.video_id + '/mqdefault.jpg'}" alt="${v.title}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300">
             <span class="absolute bottom-2 right-2 px-2 py-0.5 rounded text-[11px] font-mono bg-black/80 text-white font-semibold">
               ${durationMin}m
@@ -113,7 +119,7 @@ function renderVideosGrid() {
 
           <!-- Video Details -->
           <div class="p-4">
-            <h3 onclick="openVideoModal('${v.video_id}')" class="font-semibold text-white text-sm line-clamp-2 hover:text-brand-400 cursor-pointer transition-colors mb-1">
+            <h3 onclick="openReaderForVideo('${v.video_id}')" class="font-semibold text-white text-sm line-clamp-2 hover:text-brand-400 cursor-pointer transition-colors mb-1">
               ${v.title}
             </h3>
             <p class="text-xs text-slate-400 mb-3">${v.channel_title}</p>
@@ -130,15 +136,16 @@ function renderVideosGrid() {
         <!-- Card Footer -->
         <div class="p-4 pt-0 border-t border-dark-700/60 mt-3 flex items-center justify-between text-xs text-slate-400">
           <div class="flex items-center gap-1.5 text-brand-400 font-medium">
-            <i data-lucide="layers" class="w-3.5 h-3.5"></i>
-            <span>${cardCount} flashcards</span>
+            <i data-lucide="align-left" class="w-3.5 h-3.5"></i>
+            <span>${sections.length} crisp sections</span>
           </div>
           <div class="flex items-center gap-1">
-            <button onclick="openVideoModal('${v.video_id}')" title="Study Notes" class="p-1.5 rounded-lg hover:bg-dark-700 hover:text-white transition-colors">
-              <i data-lucide="book-open" class="w-4 h-4"></i>
+            <button onclick="openReaderForVideo('${v.video_id}')" title="Read Smart Transcript" class="px-2.5 py-1 rounded-lg bg-brand-500/10 hover:bg-brand-500/20 text-brand-400 text-xs font-semibold flex items-center gap-1 transition-colors">
+              <i data-lucide="book-open" class="w-3.5 h-3.5"></i>
+              <span>Read</span>
             </button>
-            <button onclick="downloadMarkdownById(${v.id})" title="Download Obsidian Note" class="p-1.5 rounded-lg hover:bg-dark-700 hover:text-purple-400 transition-colors">
-              <i data-lucide="file-text" class="w-4 h-4"></i>
+            <button onclick="downloadMarkdownById(${v.id})" title="Download Markdown" class="p-1.5 rounded-lg hover:bg-dark-700 hover:text-purple-400 transition-colors">
+              <i data-lucide="download" class="w-4 h-4"></i>
             </button>
             <button onclick="deleteVideoById(${v.id})" title="Delete" class="p-1.5 rounded-lg hover:bg-dark-700 hover:text-rose-400 transition-colors">
               <i data-lucide="trash-2" class="w-4 h-4"></i>
@@ -168,193 +175,204 @@ function filterCategory(cat) {
   renderVideosGrid();
 }
 
-// TAB 2: Spaced Repetition Practice
-async function loadDueCards() {
-  try {
-    const res = await fetch("/api/flashcards/due");
-    if (!res.ok) return;
-    dueFlashcards = await res.json();
-    currentCardIndex = 0;
-    renderCurrentCard();
-    loadStats();
-  } catch (e) {
-    console.error("Failed to load due cards:", e);
-  }
+// Open Smart Reader for Video
+function openReaderForVideo(videoId) {
+  const vid = allVideos.find(v => v.video_id === videoId || v.id == videoId);
+  if (!vid) return;
+  currentViewingVideo = vid;
+  document.getElementById("active-video-dot").classList.remove("hidden");
+  switchTab("reader");
+  renderReaderView(vid);
 }
 
-function renderCurrentCard() {
-  const container = document.getElementById("flashcard-container");
-  const completeState = document.getElementById("review-complete");
-  const counter = document.getElementById("review-counter");
+// Render Smart Reader View
+function renderReaderView(video) {
+  if (!video) {
+    document.getElementById("reader-empty").classList.remove("hidden");
+    return;
+  }
+  document.getElementById("reader-empty").classList.add("hidden");
 
-  if (!dueFlashcards || dueFlashcards.length === 0 || currentCardIndex >= dueFlashcards.length) {
-    container.classList.add("hidden");
-    completeState.classList.remove("hidden");
-    counter.textContent = "0 of 0";
+  // Title & Metadata
+  document.getElementById("reader-title").textContent = video.title;
+  document.getElementById("reader-category").textContent = video.category;
+  document.getElementById("reader-channel").textContent = `Channel: ${video.channel_title}`;
+  document.getElementById("reader-duration").textContent = `${Math.floor(video.duration_seconds / 60)}m ${video.duration_seconds % 60}s`;
+  document.getElementById("reader-yt-link").href = `https://www.youtube.com/watch?v=${video.video_id}`;
+
+  // 3-Bullet Takeaways
+  const bulletsEl = document.getElementById("reader-bullets");
+  bulletsEl.innerHTML = (video.summary_bullets || []).map(b => `
+    <li class="flex items-start gap-2.5">
+      <i data-lucide="check" class="w-4 h-4 text-brand-400 shrink-0 mt-0.5"></i>
+      <span class="font-medium text-slate-100">${b}</span>
+    </li>
+  `).join("");
+
+  // Concepts
+  const conceptsContainer = document.getElementById("reader-concepts-container");
+  const conceptsEl = document.getElementById("reader-concepts");
+  if (video.key_concepts && video.key_concepts.length > 0) {
+    conceptsContainer.classList.remove("hidden");
+    conceptsEl.innerHTML = video.key_concepts.map(c => `
+      <div class="bg-dark-900 border border-dark-700/80 p-3 rounded-xl text-xs">
+        <span class="text-slate-200 font-medium">${c}</span>
+      </div>
+    `).join("");
+  } else {
+    conceptsContainer.classList.add("hidden");
+  }
+
+  // Section-by-Section Smart Transcript
+  const sections = video.smart_transcript || video.topic_notes || [];
+  document.getElementById("section-count-badge").textContent = `${sections.length} sections`;
+  renderTranscriptSections(sections, video.video_id);
+
+  // Synthesis
+  document.getElementById("reader-synthesis").textContent = video.final_summary || "Synthesis not available.";
+
+  if (window.lucide) lucide.createIcons();
+}
+
+function renderTranscriptSections(sections, videoId) {
+  const container = document.getElementById("smart-transcript-sections");
+  
+  if (!sections || sections.length === 0) {
+    container.innerHTML = `
+      <div class="bg-dark-800 border border-dark-700 rounded-xl p-6 text-center text-slate-400 text-sm">
+        No structured sections available for this video.
+      </div>
+    `;
     return;
   }
 
-  container.classList.remove("hidden");
-  completeState.classList.add("hidden");
+  container.innerHTML = sections.map((sec, idx) => {
+    const tsSec = sec.timestamp_seconds || 0;
+    const tsLabel = sec.timestamp_label || "00:00";
+    const jumpUrl = `https://www.youtube.com/watch?v=${videoId}&t=${tsSec}s`;
+    const title = sec.title || `Section ${idx + 1}`;
+    const crispPoints = sec.crisp_points || sec.takeaways || [];
+    const polishedText = sec.polished_text || sec.summary || "";
 
-  const card = dueFlashcards[currentCardIndex];
-  counter.textContent = `${currentCardIndex + 1} of ${dueFlashcards.length}`;
+    return `
+      <div class="transcript-section-card bg-dark-800 border border-dark-700/90 rounded-2xl p-6 shadow-md transition-all hover:border-slate-500" data-text="${(title + ' ' + crispPoints.join(' ') + ' ' + polishedText).toLowerCase()}">
+        
+        <!-- Section Header with Clickable Timestamp -->
+        <div class="flex flex-wrap items-center justify-between gap-3 mb-4 pb-3 border-b border-dark-700/60">
+          <div class="flex items-center gap-3">
+            <a href="${jumpUrl}" target="_blank" title="Jump to this exact moment in YouTube video" class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs font-mono font-bold transition-all hover:scale-105">
+              <i data-lucide="play" class="w-3 h-3 fill-emerald-400"></i>
+              <span>${tsLabel}</span>
+            </a>
+            <h3 class="font-bold text-white text-base tracking-tight">${title}</h3>
+          </div>
+          <span class="text-[11px] text-slate-500 uppercase tracking-wider font-semibold">Section ${idx + 1}</span>
+        </div>
 
-  document.getElementById("card-video-title").textContent = card.video_title || "YouTube Video";
-  document.getElementById("card-question").textContent = card.question;
-  document.getElementById("card-answer").textContent = card.answer;
+        <!-- Crisp Bullet Points (Core Value) -->
+        ${crispPoints.length > 0 ? `
+          <div class="bg-dark-900/80 border border-dark-700/80 rounded-xl p-4 mb-4">
+            <div class="text-[11px] font-bold uppercase tracking-wider text-brand-400 mb-2 flex items-center gap-1.5">
+              <i data-lucide="zap" class="w-3.5 h-3.5"></i>
+              <span>Crisp Takeaways</span>
+            </div>
+            <ul class="space-y-1.5">
+              ${crispPoints.map(pt => `
+                <li class="flex items-start gap-2 text-xs sm:text-sm text-slate-100">
+                  <span class="text-brand-400 font-bold">•</span>
+                  <span>${pt}</span>
+                </li>
+              `).join("")}
+            </ul>
+          </div>
+        ` : ''}
+
+        <!-- Polished Cleaned-Up Transcript Text -->
+        ${polishedText ? `
+          <details class="group cursor-pointer">
+            <summary class="text-xs font-semibold text-slate-400 hover:text-slate-200 flex items-center justify-between select-none py-1">
+              <span class="flex items-center gap-1.5">
+                <i data-lucide="file-text" class="w-3.5 h-3.5 text-cyan-400"></i>
+                <span>Cleaned Spoken Transcript (Verbal fluff removed)</span>
+              </span>
+              <span class="text-[10px] text-slate-500 group-open:rotate-180 transition-transform">▼</span>
+            </summary>
+            <div class="mt-2.5 pt-2.5 border-t border-dark-700/60 text-xs text-slate-300 leading-relaxed font-sans bg-dark-900/50 p-3 rounded-lg">
+              ${polishedText}
+            </div>
+          </details>
+        ` : ''}
+
+      </div>
+    `;
+  }).join("");
+
+  if (window.lucide) lucide.createIcons();
+}
+
+// In-transcript realtime filter
+function filterTranscriptSections() {
+  const query = document.getElementById("transcript-filter").value.toLowerCase().trim();
+  const cards = document.querySelectorAll(".transcript-section-card");
   
-  const tsLabel = card.timestamp_label || "00:00";
-  document.getElementById("card-ts-label").textContent = `▶ ${tsLabel}`;
-  document.getElementById("card-ts-link").href = `https://www.youtube.com/watch?v=${card.video_id}&t=${card.timestamp_seconds || 0}s`;
-
-  // Reset answer reveal state
-  document.getElementById("card-answer-section").classList.add("hidden");
-  document.getElementById("reveal-btn-container").classList.remove("hidden");
-  document.getElementById("rating-buttons-container").classList.add("hidden");
-}
-
-function revealCardAnswer() {
-  document.getElementById("card-answer-section").classList.remove("hidden");
-  document.getElementById("reveal-btn-container").classList.add("hidden");
-  document.getElementById("rating-buttons-container").classList.remove("hidden");
-}
-
-async function rateCard(rating) {
-  if (currentCardIndex >= dueFlashcards.length) return;
-  const card = dueFlashcards[currentCardIndex];
-
-  try {
-    const res = await fetch(`/api/flashcards/${card.id}/review`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ rating: rating })
-    });
-    if (!res.ok) {
-      console.error("Failed to submit review");
-    }
-  } catch (e) {
-    console.error("Review request error:", e);
-  }
-
-  currentCardIndex++;
-  renderCurrentCard();
-  loadStats();
-}
-
-function setupKeyboardShortcuts() {
-  document.addEventListener("keydown", (e) => {
-    // Only in review tab
-    const reviewTab = document.getElementById("tab-review");
-    if (reviewTab.classList.contains("hidden")) return;
-
-    const answerVisible = !document.getElementById("card-answer-section").classList.contains("hidden");
-
-    if (e.code === "Space" && !answerVisible) {
-      e.preventDefault();
-      revealCardAnswer();
-    } else if (answerVisible) {
-      if (e.key === "1") rateCard("AGAIN");
-      else if (e.key === "2") rateCard("HARD");
-      else if (e.key === "3") rateCard("GOOD");
-      else if (e.key === "4") rateCard("EASY");
+  cards.forEach(card => {
+    const text = card.getAttribute("data-text") || "";
+    if (!query || text.includes(query)) {
+      card.classList.remove("hidden");
+    } else {
+      card.classList.add("hidden");
     }
   });
 }
 
-// Video Study Notes Modal
-function openVideoModal(videoIdOrRaw) {
-  const video = allVideos.find(v => v.video_id === videoIdOrRaw || v.id == videoIdOrRaw);
-  if (!video) return;
-  currentViewingVideo = video;
-
-  document.getElementById("modal-title").textContent = video.title;
-  document.getElementById("modal-category").textContent = video.category;
-  document.getElementById("modal-channel").textContent = video.channel_title;
-  document.getElementById("modal-duration").textContent = `${Math.floor(video.duration_seconds / 60)}m ${video.duration_seconds % 60}s`;
-  document.getElementById("modal-yt-link").href = `https://www.youtube.com/watch?v=${video.video_id}`;
-
-  // Bullets
-  const bulletsEl = document.getElementById("modal-bullets");
-  bulletsEl.innerHTML = (video.summary_bullets || []).map(b => `<li>${b}</li>`).join("");
-
-  // Key Concepts
-  const conceptsEl = document.getElementById("modal-concepts");
-  conceptsEl.innerHTML = (video.key_concepts || []).map(c => `
-    <div class="bg-dark-900/80 border border-dark-700/60 p-2.5 rounded-lg text-xs">
-      ${c}
-    </div>
-  `).join("");
-
-  // Topics
-  const topicsEl = document.getElementById("modal-topics");
-  topicsEl.innerHTML = (video.topic_notes || []).map(t => `
-    <div class="bg-dark-900/80 border border-dark-700/60 p-3 rounded-lg">
-      <div class="flex items-center justify-between mb-1">
-        <span class="font-semibold text-white text-xs">${t.title || 'Topic'}</span>
-        <a href="https://www.youtube.com/watch?v=${video.video_id}&t=${t.timestamp_seconds || 0}s" target="_blank" class="text-brand-400 font-mono text-xs hover:underline flex items-center gap-1">
-          ▶ ${t.timestamp_label || '00:00'}
-        </a>
-      </div>
-      <p class="text-slate-300 text-xs">${t.summary || ''}</p>
-    </div>
-  `).join("");
-
-  // Flashcards
-  const flashEl = document.getElementById("modal-flashcards");
-  flashEl.innerHTML = (video.flashcards || []).map(f => `
-    <details class="bg-dark-900/80 border border-dark-700/60 rounded-lg p-2.5 cursor-pointer">
-      <summary class="font-medium text-slate-200 text-xs flex items-center justify-between">
-        <span>${f.question}</span>
-        <span class="text-slate-500 text-[10px] ml-2">Click to reveal</span>
-      </summary>
-      <div class="mt-2 pt-2 border-t border-dark-700 text-brand-300 text-xs">
-        ${f.answer}
-      </div>
-    </details>
-  `).join("");
-
-  // Synthesis
-  document.getElementById("modal-synthesis").textContent = video.final_summary || "Synthesis not available.";
-
-  document.getElementById("video-modal").classList.remove("hidden");
-  if (window.lucide) lucide.createIcons();
-}
-
-function closeVideoModal() {
-  document.getElementById("video-modal").classList.add("hidden");
-}
-
-// Exports
-async function exportCurrentVideo(target) {
+// Copy Actions
+function copyCrispPoints() {
   if (!currentViewingVideo) return;
-  const btn = document.getElementById(`modal-export-${target}-btn`);
-  const originalText = btn.innerHTML;
-  btn.innerHTML = `<span>Exporting...</span>`;
+  const sections = currentViewingVideo.smart_transcript || currentViewingVideo.topic_notes || [];
+  
+  let out = `# ${currentViewingVideo.title}\n\n`;
+  out += `## Executive Takeaways:\n`;
+  (currentViewingVideo.summary_bullets || []).forEach(b => out += `- ${b}\n`);
+  out += `\n`;
 
-  try {
-    const res = await fetch(`/api/export/${target}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ target: target, video_id: currentViewingVideo.id })
-    });
-    const data = await res.json();
-    if (res.ok) {
-      alert(`Success: ${data.message || 'Exported successfully!'}`);
-    } else {
-      alert(`Export Notice: ${data.detail || data.message}`);
-    }
-  } catch (e) {
-    alert(`Export Error: ${e.message}`);
-  } finally {
-    btn.innerHTML = originalText;
-    if (window.lucide) lucide.createIcons();
+  sections.forEach(s => {
+    out += `### [${s.timestamp_label || '00:00'}] ${s.title || 'Section'}\n`;
+    const pts = s.crisp_points || s.takeaways || [];
+    pts.forEach(p => out += `- ${p}\n`);
+    out += `\n`;
+  });
+
+  navigator.clipboard.writeText(out).then(() => {
+    const btnText = document.getElementById("copy-points-text");
+    btnText.textContent = "✓ Copied to Clipboard!";
+    setTimeout(() => btnText.textContent = "Copy Crisp Takeaways", 2000);
+  });
+}
+
+function copyFullTranscript() {
+  if (!currentViewingVideo) return;
+  const sections = currentViewingVideo.smart_transcript || currentViewingVideo.topic_notes || [];
+  
+  let out = `# ${currentViewingVideo.title}\n\n`;
+  sections.forEach(s => {
+    out += `[${s.timestamp_label || '00:00'}] ${s.title || 'Section'}\n`;
+    out += `${s.polished_text || s.summary || ''}\n\n`;
+  });
+
+  if (!sections.length && currentViewingVideo.transcript_clean) {
+    out += currentViewingVideo.transcript_clean;
   }
+
+  navigator.clipboard.writeText(out).then(() => {
+    const btnText = document.getElementById("copy-transcript-text");
+    btnText.textContent = "✓ Copied to Clipboard!";
+    setTimeout(() => btnText.textContent = "Copy Full Transcript", 2000);
+  });
 }
 
-function downloadCurrentVideoTsv() {
+function downloadReaderMarkdown() {
   if (!currentViewingVideo) return;
-  window.location.href = `/api/export/anki/${currentViewingVideo.id}/download-tsv`;
+  downloadMarkdownById(currentViewingVideo.id);
 }
 
 function downloadMarkdownById(videoId) {
@@ -362,10 +380,13 @@ function downloadMarkdownById(videoId) {
 }
 
 async function deleteVideoById(videoId) {
-  if (!confirm("Are you sure you want to delete this video and all its flashcards?")) return;
+  if (!confirm("Are you sure you want to delete this transcript?")) return;
   try {
     const res = await fetch(`/api/videos/${videoId}`, { method: "DELETE" });
     if (res.ok) {
+      if (currentViewingVideo && currentViewingVideo.id === videoId) {
+        currentViewingVideo = null;
+      }
       loadVideos();
     }
   } catch (e) {
@@ -386,8 +407,6 @@ function closeCaptureModal() {
 
 async function submitVideoIntake() {
   const url = document.getElementById("intake-url").value.trim();
-  const watchTime = parseInt(document.getElementById("intake-watch-time").value) || 0;
-  const watchPct = parseFloat(document.getElementById("intake-watch-pct").value) || 0.0;
   const force = document.getElementById("intake-force").checked;
 
   if (!url) {
@@ -402,7 +421,7 @@ async function submitVideoIntake() {
   submitBtn.disabled = true;
   submitBtn.classList.add("opacity-50");
   statusBox.classList.remove("hidden");
-  statusText.textContent = "Connecting to pipeline & transcribing...";
+  statusText.textContent = "Transcribing & filtering conversational noise...";
 
   try {
     const res = await fetch("/api/videos/intake", {
@@ -410,29 +429,30 @@ async function submitVideoIntake() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         video_url_or_id: url,
-        watch_time_seconds: watchTime,
-        watch_percent: watchPct,
+        watch_time_seconds: 300,
+        watch_percent: 100,
         force_process: force
       })
     });
 
     const data = await res.json();
     if (!res.ok) {
-      throw new Error(data.detail || "Video intake failed");
+      throw new Error(data.detail || "Video transcription failed");
     }
 
-    statusText.textContent = "Flashcards and study material generated!";
+    statusText.textContent = "Smart transcript distilled successfully!";
     setTimeout(() => {
       closeCaptureModal();
       submitBtn.disabled = false;
       submitBtn.classList.remove("opacity-50");
       document.getElementById("intake-url").value = "";
-      loadVideos();
-      openVideoModal(data.video_id);
-    }, 800);
+      loadVideos().then(() => {
+        openReaderForVideo(data.video_id);
+      });
+    }, 600);
 
   } catch (e) {
-    alert("Intake Error: " + e.message);
+    alert("Transcription Error: " + e.message);
     submitBtn.disabled = false;
     submitBtn.classList.remove("opacity-50");
     statusBox.classList.add("hidden");
@@ -448,11 +468,7 @@ async function loadSettings() {
 
     document.getElementById("setting-provider").value = data.DEFAULT_AI_PROVIDER || "local_offline";
     document.getElementById("setting-obsidian-path").value = data.OBSIDIAN_VAULT_PATH || "";
-    document.getElementById("setting-anki-url").value = data.ANKI_CONNECT_URL || "http://localhost:8765";
-    document.getElementById("setting-anki-deck").value = data.ANKI_DECK_NAME || "YouTube Micro-Learning";
     document.getElementById("setting-notion-db").value = data.NOTION_DATABASE_ID || "";
-    document.getElementById("setting-watch-threshold").value = data.WATCH_THRESHOLD_PERCENT || 50;
-    document.getElementById("setting-min-duration").value = data.MIN_DURATION_SECONDS || 180;
   } catch (e) {
     console.error("Failed to load settings:", e);
   }
@@ -463,11 +479,7 @@ async function saveSettings() {
     settings: {
       DEFAULT_AI_PROVIDER: document.getElementById("setting-provider").value,
       OBSIDIAN_VAULT_PATH: document.getElementById("setting-obsidian-path").value,
-      ANKI_CONNECT_URL: document.getElementById("setting-anki-url").value,
-      ANKI_DECK_NAME: document.getElementById("setting-anki-deck").value,
       NOTION_DATABASE_ID: document.getElementById("setting-notion-db").value,
-      WATCH_THRESHOLD_PERCENT: document.getElementById("setting-watch-threshold").value,
-      MIN_DURATION_SECONDS: document.getElementById("setting-min-duration").value,
     }
   };
 

@@ -138,3 +138,4 @@ Following the specification in the architecture design, flashcards advance along
 | **Step 6** | 60 days | Long-term memory transfer. |
 | **Step 7** | 90 days | Quarterly validation. |
 | **Step 8** | 180 days | Permanent mastery milestone. |
+

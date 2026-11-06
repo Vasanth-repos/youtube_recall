@@ -46,8 +46,8 @@
     injectedButton = document.createElement("button");
     injectedButton.id = "yt-recall-save-btn";
     injectedButton.className = "yt-recall-btn";
-    injectedButton.innerHTML = "<span>🧠 Save to Learn</span>";
-    injectedButton.title = "Extract transcript, generate AI recall flashcards, and schedule spaced revision";
+    injectedButton.innerHTML = "<span>✨ AI Smart Transcript</span>";
+    injectedButton.title = "Clean transcript, remove verbal fluff, and generate crisp on-to-the-point notes";
 
     injectedButton.addEventListener("click", async (e) => {
       e.preventDefault();
@@ -123,3 +123,4 @@
   // Run on page load and URL change (YouTube is a SPA)
   setInterval(injectSaveButton, 1500);
 })();
+

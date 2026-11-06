@@ -63,3 +63,4 @@ class SpacedRepetitionService:
             next_review = now + timedelta(days=max(1, new_interval))
 
         return next_review, new_step, new_interval, round(ease_factor, 2), new_status
+

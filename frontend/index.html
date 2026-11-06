@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>YouTube Recall | AI Micro-Learning & Spaced Repetition</title>
+  <title>YouTube Recall | AI Smart Transcript & Crisp Notes</title>
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
@@ -39,16 +39,16 @@
   <!-- Top Navbar -->
   <header class="border-b border-dark-700 bg-dark-800/90 backdrop-blur sticky top-0 z-40">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-      <div class="flex items-center gap-3">
+      <div class="flex items-center gap-3 cursor-pointer" onclick="switchTab('library')">
         <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-brand-600 to-emerald-400 flex items-center justify-center shadow-lg shadow-brand-500/20">
-          <i data-lucide="brain" class="w-6 h-6 text-black stroke-[2.5]"></i>
+          <i data-lucide="sparkles" class="w-6 h-6 text-black stroke-[2.5]"></i>
         </div>
         <div>
           <span class="font-bold text-lg tracking-tight text-white flex items-center gap-2">
             YouTube Recall
-            <span class="text-[10px] font-semibold tracking-wider uppercase px-2 py-0.5 rounded-full bg-brand-500/10 text-brand-400 border border-brand-500/20">100% Free</span>
+            <span class="text-[10px] font-semibold tracking-wider uppercase px-2 py-0.5 rounded-full bg-brand-500/10 text-brand-400 border border-brand-500/20">Smart Transcript</span>
           </span>
-          <p class="text-xs text-slate-400">Micro-Learning & Spaced Practice Ecosystem</p>
+          <p class="text-xs text-slate-400">AI-Powered Crisp & On-to-the-Point Notes</p>
         </div>
       </div>
 
@@ -58,10 +58,10 @@
           <i data-lucide="library" class="w-4 h-4"></i>
           <span>Library</span>
         </button>
-        <button id="nav-review-btn" onclick="switchTab('review')" class="nav-tab relative flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm font-medium transition-colors">
-          <i data-lucide="repeat" class="w-4 h-4"></i>
-          <span>Review Due</span>
-          <span id="due-badge" class="hidden text-xs bg-brand-500 text-black font-bold px-2 py-0.5 rounded-full">0</span>
+        <button id="nav-reader-btn" onclick="switchTab('reader')" class="nav-tab flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm font-medium transition-colors">
+          <i data-lucide="book-open" class="w-4 h-4"></i>
+          <span>Smart Reader</span>
+          <span id="active-video-dot" class="hidden w-2 h-2 rounded-full bg-brand-400"></span>
         </button>
         <button id="nav-settings-btn" onclick="switchTab('settings')" class="nav-tab flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm font-medium transition-colors">
           <i data-lucide="sliders" class="w-4 h-4"></i>
@@ -79,41 +79,34 @@
   <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
 
     <!-- Stat Highlights Bar -->
-    <section class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
+    <section class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
       <div class="bg-dark-800 border border-dark-700/80 rounded-xl p-4 shadow-sm">
         <div class="flex items-center justify-between text-slate-400 mb-1">
-          <span class="text-xs font-medium uppercase tracking-wider">Learned Videos</span>
+          <span class="text-xs font-medium uppercase tracking-wider">Videos Transcribed</span>
           <i data-lucide="video" class="w-4 h-4 text-emerald-400"></i>
         </div>
         <p id="stat-videos" class="text-2xl font-bold text-white tracking-tight">0</p>
       </div>
       <div class="bg-dark-800 border border-dark-700/80 rounded-xl p-4 shadow-sm">
         <div class="flex items-center justify-between text-slate-400 mb-1">
-          <span class="text-xs font-medium uppercase tracking-wider">Active Flashcards</span>
-          <i data-lucide="layers" class="w-4 h-4 text-cyan-400"></i>
+          <span class="text-xs font-medium uppercase tracking-wider">Crisp Sections</span>
+          <i data-lucide="file-text" class="w-4 h-4 text-cyan-400"></i>
         </div>
-        <p id="stat-cards" class="text-2xl font-bold text-white tracking-tight">0</p>
-      </div>
-      <div class="bg-dark-800 border border-dark-700/80 rounded-xl p-4 shadow-sm relative overflow-hidden">
-        <div class="flex items-center justify-between text-slate-400 mb-1">
-          <span class="text-xs font-medium uppercase tracking-wider">Due Today</span>
-          <i data-lucide="alarm-clock" class="w-4 h-4 text-amber-400"></i>
-        </div>
-        <p id="stat-due" class="text-2xl font-bold text-amber-400 tracking-tight">0</p>
+        <p id="stat-sections" class="text-2xl font-bold text-white tracking-tight">0</p>
       </div>
       <div class="bg-dark-800 border border-dark-700/80 rounded-xl p-4 shadow-sm">
         <div class="flex items-center justify-between text-slate-400 mb-1">
-          <span class="text-xs font-medium uppercase tracking-wider">Mastered Cards</span>
-          <i data-lucide="award" class="w-4 h-4 text-purple-400"></i>
+          <span class="text-xs font-medium uppercase tracking-wider">Knowledge Points</span>
+          <i data-lucide="check-circle-2" class="w-4 h-4 text-brand-400"></i>
         </div>
-        <p id="stat-mastered" class="text-2xl font-bold text-white tracking-tight">0</p>
+        <p id="stat-points" class="text-2xl font-bold text-white tracking-tight">0</p>
       </div>
-      <div class="bg-dark-800 border border-dark-700/80 rounded-xl p-4 shadow-sm col-span-2 md:col-span-1">
+      <div class="bg-dark-800 border border-dark-700/80 rounded-xl p-4 shadow-sm">
         <div class="flex items-center justify-between text-slate-400 mb-1">
-          <span class="text-xs font-medium uppercase tracking-wider">Total Reviews</span>
-          <i data-lucide="check-check" class="w-4 h-4 text-brand-400"></i>
+          <span class="text-xs font-medium uppercase tracking-wider">Fluff & Filler Removed</span>
+          <i data-lucide="scissors" class="w-4 h-4 text-amber-400"></i>
         </div>
-        <p id="stat-reviews" class="text-2xl font-bold text-white tracking-tight">0</p>
+        <p id="stat-filler" class="text-2xl font-bold text-amber-400 tracking-tight">100%</p>
       </div>
     </section>
 
@@ -122,7 +115,7 @@
       <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
         <div class="relative flex-1 max-w-md">
           <i data-lucide="search" class="w-4 h-4 absolute left-3.5 top-3.5 text-slate-400"></i>
-          <input type="text" id="search-input" onkeyup="handleSearch()" placeholder="Search video title, channel, topic..." class="w-full bg-dark-800 border border-dark-700 rounded-lg pl-10 pr-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-brand-500 transition-colors">
+          <input type="text" id="search-input" onkeyup="handleSearch()" placeholder="Search video title, topic, concept..." class="w-full bg-dark-800 border border-dark-700 rounded-lg pl-10 pr-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-brand-500 transition-colors">
         </div>
         <div class="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0">
           <button onclick="filterCategory('')" class="category-pill active px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap bg-dark-800 text-slate-300 border border-dark-700 hover:border-slate-500 transition-colors">All</button>
@@ -142,107 +135,118 @@
         <div class="w-16 h-16 mx-auto rounded-full bg-dark-700 flex items-center justify-center text-slate-400 mb-4">
           <i data-lucide="youtube" class="w-8 h-8"></i>
         </div>
-        <h3 class="text-lg font-semibold text-white mb-1">No videos captured yet</h3>
+        <h3 class="text-lg font-semibold text-white mb-1">No videos transcribed yet</h3>
         <p class="text-sm text-slate-400 max-w-sm mx-auto mb-6">
-          Add any YouTube educational video URL manually or use the YouTube Recall Chrome extension to auto-capture as you watch.
+          Add any YouTube educational video to transform messy audio into a crisp, on-to-the-point structured smart transcript.
         </p>
         <button onclick="openCaptureModal()" class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-brand-500 text-black font-semibold text-sm hover:bg-brand-600 transition-colors">
           <i data-lucide="plus" class="w-4 h-4 stroke-[3]"></i>
-          Add Your First Video
+          Transcribe Your First Video
         </button>
       </div>
     </div>
 
-    <!-- TAB 2: Spaced Repetition Practice -->
-    <div id="tab-review" class="hidden max-w-3xl mx-auto space-y-6">
-      <div class="flex items-center justify-between border-b border-dark-700 pb-4">
-        <div>
-          <h2 class="text-xl font-bold text-white flex items-center gap-2">
-            <i data-lucide="brain-circuit" class="w-6 h-6 text-brand-400"></i>
-            Active Recall Practice
+    <!-- TAB 2: AI Smart Transcript Reader (Main Focus) -->
+    <div id="tab-reader" class="hidden max-w-4xl mx-auto space-y-6">
+      
+      <!-- Video Header & Control Bar -->
+      <div class="bg-dark-800 border border-dark-700 rounded-2xl p-6 shadow-xl space-y-4">
+        <div class="flex flex-col md:flex-row md:items-start justify-between gap-4">
+          <div class="flex-1">
+            <div class="flex items-center gap-2 mb-2">
+              <span id="reader-category" class="text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-brand-500/10 text-brand-400 border border-brand-500/20">Category</span>
+              <span id="reader-duration" class="text-xs text-slate-400 font-mono">00:00</span>
+            </div>
+            <h1 id="reader-title" class="text-2xl font-bold text-white tracking-tight leading-snug">
+              Select a video to read its smart transcript
+            </h1>
+            <p id="reader-channel" class="text-sm text-slate-400 mt-1">Channel Name</p>
+          </div>
+
+          <div class="flex flex-wrap items-center gap-2">
+            <a id="reader-yt-link" href="#" target="_blank" class="px-3.5 py-2 rounded-lg bg-dark-700 hover:bg-dark-600 text-xs font-semibold text-white flex items-center gap-1.5 transition-colors border border-dark-600">
+              <i data-lucide="play" class="w-3.5 h-3.5 text-red-500 fill-red-500"></i>
+              <span>Watch on YouTube</span>
+            </a>
+            <button onclick="copyCrispPoints()" class="px-3.5 py-2 rounded-lg bg-dark-700 hover:bg-dark-600 text-xs font-semibold text-brand-300 flex items-center gap-1.5 transition-colors border border-dark-600">
+              <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+              <span id="copy-points-text">Copy Crisp Takeaways</span>
+            </button>
+            <button onclick="copyFullTranscript()" class="px-3.5 py-2 rounded-lg bg-dark-700 hover:bg-dark-600 text-xs font-semibold text-cyan-300 flex items-center gap-1.5 transition-colors border border-dark-600">
+              <i data-lucide="file-text" class="w-3.5 h-3.5"></i>
+              <span id="copy-transcript-text">Copy Full Transcript</span>
+            </button>
+            <button onclick="downloadReaderMarkdown()" class="px-3.5 py-2 rounded-lg bg-dark-700 hover:bg-dark-600 text-xs font-semibold text-purple-300 flex items-center gap-1.5 transition-colors border border-dark-600">
+              <i data-lucide="download" class="w-3.5 h-3.5"></i>
+              <span>Download .md</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- In-Transcript Realtime Filter -->
+        <div class="relative pt-2 border-t border-dark-700/60">
+          <i data-lucide="filter" class="w-4 h-4 absolute left-3 top-5 text-slate-400"></i>
+          <input type="text" id="transcript-filter" onkeyup="filterTranscriptSections()" placeholder="Quick filter transcript topics or key terms (e.g. formula, memory, example)..." class="w-full bg-dark-900 border border-dark-700 rounded-lg pl-9 pr-4 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-brand-500">
+        </div>
+      </div>
+
+      <!-- Executive TL;DR Box -->
+      <div class="bg-gradient-to-r from-brand-950/40 via-dark-800 to-dark-800 border border-brand-500/30 rounded-2xl p-6 shadow-lg">
+        <h3 class="text-xs font-bold uppercase tracking-wider text-brand-400 mb-3 flex items-center gap-2">
+          <i data-lucide="zap" class="w-4 h-4 text-brand-400 fill-brand-400"></i>
+          Executive 3-Bullet Takeaway (Ultra-Crisp)
+        </h3>
+        <ul id="reader-bullets" class="space-y-2 text-sm text-slate-200">
+          <!-- Rendered via JS -->
+        </ul>
+      </div>
+
+      <!-- Key Concepts Glossary -->
+      <div id="reader-concepts-container" class="bg-dark-800 border border-dark-700 rounded-2xl p-6 shadow-lg">
+        <h3 class="text-xs font-bold uppercase tracking-wider text-cyan-400 mb-3 flex items-center gap-2">
+          <i data-lucide="lightbulb" class="w-4 h-4 text-cyan-400"></i>
+          Key Concepts & Definitions
+        </h3>
+        <div id="reader-concepts" class="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <!-- Rendered via JS -->
+        </div>
+      </div>
+
+      <!-- Section-by-Section AI Smart Transcript -->
+      <div class="space-y-4">
+        <div class="flex items-center justify-between">
+          <h2 class="text-lg font-bold text-white flex items-center gap-2">
+            <i data-lucide="align-left" class="w-5 h-5 text-emerald-400"></i>
+            Chronological Smart Transcript
           </h2>
-          <p class="text-xs text-slate-400">Spaced repetition schedule: 0d (Immediate) → 1d → 3d → 7d → 15d → 30d → 60d → 90d → 180d</p>
+          <span id="section-count-badge" class="text-xs text-slate-400 font-mono">0 sections</span>
         </div>
-        <div class="text-right">
-          <span id="review-counter" class="text-sm font-semibold text-slate-300">0 of 0</span>
-        </div>
-      </div>
 
-      <!-- Active Flashcard Container -->
-      <div id="flashcard-container" class="relative">
-        <div id="flashcard-box" class="bg-dark-800 border border-dark-700 rounded-2xl p-8 min-h-[340px] flex flex-col justify-between shadow-2xl transition-all">
-          <div>
-            <div class="flex items-center justify-between text-xs text-slate-400 mb-4 pb-3 border-b border-dark-700/60">
-              <span id="card-video-title" class="font-medium text-slate-300 truncate max-w-md">Video Title</span>
-              <a id="card-ts-link" href="#" target="_blank" class="inline-flex items-center gap-1 text-emerald-400 hover:text-emerald-300 font-mono">
-                <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
-                <span id="card-ts-label">00:00</span>
-              </a>
-            </div>
-
-            <!-- Front / Question -->
-            <div class="mb-6">
-              <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400 bg-dark-700/80 px-2.5 py-1 rounded">Question (Active Recall)</span>
-              <p id="card-question" class="text-lg sm:text-xl font-semibold text-white mt-4 leading-relaxed">
-                Loading question...
-              </p>
-            </div>
-
-            <!-- Back / Answer (Hidden until clicked) -->
-            <div id="card-answer-section" class="hidden mt-6 pt-6 border-t border-dark-700/80 bg-dark-900/60 -mx-8 -mb-8 p-8 rounded-b-2xl">
-              <span class="text-[11px] font-bold uppercase tracking-wider text-brand-400 bg-brand-500/10 px-2.5 py-1 rounded border border-brand-500/20">Answer & Explanation</span>
-              <p id="card-answer" class="text-slate-200 mt-3 text-base leading-relaxed">
-                Answer content will appear here.
-              </p>
-            </div>
-          </div>
-
-          <!-- Bottom Action Buttons -->
-          <div class="mt-8 pt-4">
-            <!-- Reveal button -->
-            <div id="reveal-btn-container">
-              <button onclick="revealCardAnswer()" class="w-full py-3.5 rounded-xl bg-dark-700 hover:bg-dark-600 text-white font-semibold text-sm transition-all flex items-center justify-center gap-2 border border-dark-600">
-                <i data-lucide="eye" class="w-4 h-4"></i>
-                <span>Show Answer (or Press Space)</span>
-              </button>
-            </div>
-
-            <!-- SM-2 Rating Buttons -->
-            <div id="rating-buttons-container" class="hidden grid grid-cols-4 gap-2 sm:gap-3">
-              <button onclick="rateCard('AGAIN')" class="py-3 px-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-300 font-medium text-xs sm:text-sm text-center transition-colors">
-                <div class="font-bold text-rose-400">Again</div>
-                <div class="text-[10px] text-slate-400 mt-0.5">&lt; 10 min</div>
-              </button>
-              <button onclick="rateCard('HARD')" class="py-3 px-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 font-medium text-xs sm:text-sm text-center transition-colors">
-                <div class="font-bold text-amber-400">Hard</div>
-                <div class="text-[10px] text-slate-400 mt-0.5">+1 day</div>
-              </button>
-              <button onclick="rateCard('GOOD')" class="py-3 px-2 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 font-medium text-xs sm:text-sm text-center transition-colors">
-                <div class="font-bold text-emerald-400">Good</div>
-                <div class="text-[10px] text-slate-400 mt-0.5">Next step</div>
-              </button>
-              <button onclick="rateCard('EASY')" class="py-3 px-2 rounded-xl bg-sky-500/10 hover:bg-sky-500/20 border border-sky-500/30 text-sky-300 font-medium text-xs sm:text-sm text-center transition-colors">
-                <div class="font-bold text-sky-400">Easy</div>
-                <div class="text-[10px] text-slate-400 mt-0.5">+2 steps</div>
-              </button>
-            </div>
-          </div>
+        <div id="smart-transcript-sections" class="space-y-4">
+          <!-- Rendered via JS -->
         </div>
       </div>
 
-      <!-- All Caught Up State -->
-      <div id="review-complete" class="hidden text-center py-16 px-6 bg-dark-800 rounded-2xl border border-dark-700">
-        <div class="w-16 h-16 mx-auto rounded-full bg-brand-500/10 border border-brand-500/20 flex items-center justify-center text-brand-400 mb-4">
-          <i data-lucide="check-circle" class="w-8 h-8"></i>
+      <!-- Comprehensive Synthesis -->
+      <div class="bg-dark-800 border border-dark-700 rounded-2xl p-6 shadow-lg">
+        <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Final Cohesive Synthesis</h3>
+        <p id="reader-synthesis" class="text-sm text-slate-300 leading-relaxed"></p>
+      </div>
+
+      <!-- Reader Empty State -->
+      <div id="reader-empty" class="hidden text-center py-20 px-6 bg-dark-800 rounded-2xl border border-dark-700">
+        <div class="w-16 h-16 mx-auto rounded-full bg-dark-700 flex items-center justify-center text-slate-400 mb-4">
+          <i data-lucide="book-open" class="w-8 h-8"></i>
         </div>
-        <h3 class="text-xl font-bold text-white mb-2">You're all caught up for today!</h3>
-        <p class="text-sm text-slate-400 max-w-md mx-auto mb-6">
-          Great work on combating the forgetting curve. Future reviews will unlock automatically based on your 1d, 3d, 7d, 15d schedule.
+        <h3 class="text-lg font-semibold text-white mb-2">No video selected</h3>
+        <p class="text-sm text-slate-400 max-w-sm mx-auto mb-6">
+          Choose a video from your Library or capture a new one to view its crisp, AI-refined transcript.
         </p>
-        <button onclick="switchTab('library')" class="px-5 py-2.5 rounded-lg bg-dark-700 hover:bg-dark-600 text-white font-medium text-sm transition-colors">
+        <button onclick="switchTab('library')" class="px-5 py-2.5 rounded-lg bg-brand-500 hover:bg-brand-600 text-black font-semibold text-xs transition-colors">
           Browse Library
         </button>
       </div>
+
     </div>
 
     <!-- TAB 3: Settings & Integrations -->
@@ -252,7 +256,7 @@
           <i data-lucide="sliders" class="w-6 h-6 text-brand-400"></i>
           Settings & Free Integrations
         </h2>
-        <p class="text-xs text-slate-400">Configure free AI synthesizers and note-taking apps (Obsidian, Anki, Notion).</p>
+        <p class="text-xs text-slate-400">Configure free AI synthesizers and note-taking apps (Obsidian, Notion, Anki).</p>
       </div>
 
       <div class="space-y-6">
@@ -260,7 +264,7 @@
         <div class="bg-dark-800 border border-dark-700 rounded-xl p-6">
           <h3 class="text-base font-semibold text-white mb-1 flex items-center gap-2">
             <i data-lucide="sparkles" class="w-4 h-4 text-emerald-400"></i>
-            AI Recall Provider (100% Free Tiers)
+            AI Synthesizer Engine (100% Free Tiers)
           </h3>
           <p class="text-xs text-slate-400 mb-4">
             Select your synthesis engine. The local offline NLP heuristic is completely free with zero keys needed!
@@ -297,24 +301,13 @@
             Note Apps Routing
           </h3>
           <p class="text-xs text-slate-400 mb-4">
-            Connect to Obsidian, Anki Desktop, or Notion (as specified in architecture spec).
+            Connect to Obsidian, Anki Desktop, or Notion.
           </p>
 
           <div class="space-y-4">
             <div>
               <label class="block text-xs font-medium text-slate-300 mb-1.5">Obsidian Vault Folder Path (Direct .md export)</label>
               <input type="text" id="setting-obsidian-path" placeholder="C:\Users\username\Documents\MyVault\YouTube Notes" class="w-full bg-dark-900 border border-dark-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-brand-500">
-            </div>
-
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label class="block text-xs font-medium text-slate-300 mb-1.5">AnkiConnect URL</label>
-                <input type="text" id="setting-anki-url" value="http://localhost:8765" class="w-full bg-dark-900 border border-dark-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-brand-500">
-              </div>
-              <div>
-                <label class="block text-xs font-medium text-slate-300 mb-1.5">Anki Deck Name</label>
-                <input type="text" id="setting-anki-deck" value="YouTube Micro-Learning" class="w-full bg-dark-900 border border-dark-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-brand-500">
-              </div>
             </div>
 
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -330,26 +323,6 @@
           </div>
         </div>
 
-        <!-- Intake Thresholds -->
-        <div class="bg-dark-800 border border-dark-700 rounded-xl p-6">
-          <h3 class="text-base font-semibold text-white mb-1 flex items-center gap-2">
-            <i data-lucide="filter" class="w-4 h-4 text-purple-400"></i>
-            Intake & Filter Rules
-          </h3>
-          <p class="text-xs text-slate-400 mb-4">Controls automatic validation thresholds to suppress noise.</p>
-
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label class="block text-xs font-medium text-slate-300 mb-1.5">Watch Progress Threshold (%)</label>
-              <input type="number" id="setting-watch-threshold" value="50" min="0" max="100" class="w-full bg-dark-900 border border-dark-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-brand-500">
-            </div>
-            <div>
-              <label class="block text-xs font-medium text-slate-300 mb-1.5">Min Video Duration (seconds)</label>
-              <input type="number" id="setting-min-duration" value="180" min="30" class="w-full bg-dark-900 border border-dark-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-brand-500">
-            </div>
-          </div>
-        </div>
-
         <div class="flex justify-end">
           <button onclick="saveSettings()" class="px-6 py-2.5 rounded-lg bg-brand-500 hover:bg-brand-600 text-black font-semibold text-sm transition-all shadow-lg shadow-brand-500/20">
             Save Configuration
@@ -359,108 +332,13 @@
     </div>
   </main>
 
-  <!-- Video Study Notes & Flashcard Inspector Modal -->
-  <div id="video-modal" class="hidden fixed inset-0 z-50 overflow-y-auto bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-    <div class="bg-dark-800 border border-dark-700 rounded-2xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
-      <!-- Modal Header -->
-      <div class="p-6 border-b border-dark-700 flex items-start justify-between gap-4">
-        <div>
-          <span id="modal-category" class="text-[11px] font-bold uppercase tracking-wider text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded border border-emerald-500/20">Category</span>
-          <h2 id="modal-title" class="text-xl font-bold text-white mt-2 leading-tight">Video Title</h2>
-          <div class="flex items-center gap-3 text-xs text-slate-400 mt-1">
-            <span id="modal-channel">Channel</span>
-            <span>•</span>
-            <span id="modal-duration">Duration</span>
-            <span>•</span>
-            <a id="modal-yt-link" href="#" target="_blank" class="text-brand-400 hover:underline flex items-center gap-1">
-              Watch on YouTube <i data-lucide="external-link" class="w-3 h-3"></i>
-            </a>
-          </div>
-        </div>
-        <button onclick="closeVideoModal()" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-dark-700 transition-colors">
-          <i data-lucide="x" class="w-5 h-5"></i>
-        </button>
-      </div>
-
-      <!-- Modal Body -->
-      <div class="p-6 overflow-y-auto space-y-6 flex-1 text-sm text-slate-300">
-        <!-- 3-Bullet Summary -->
-        <div class="bg-dark-900/60 border border-dark-700/60 rounded-xl p-4">
-          <h4 class="text-xs font-bold uppercase tracking-wider text-brand-400 mb-2 flex items-center gap-1.5">
-            <i data-lucide="list-checks" class="w-4 h-4"></i> 3-Bullet Takeaway
-          </h4>
-          <ul id="modal-bullets" class="space-y-1.5 list-disc list-inside text-slate-200">
-          </ul>
-        </div>
-
-        <!-- Key Concepts -->
-        <div>
-          <h4 class="text-xs font-bold uppercase tracking-wider text-cyan-400 mb-2 flex items-center gap-1.5">
-            <i data-lucide="lightbulb" class="w-4 h-4"></i> Core Concepts
-          </h4>
-          <div id="modal-concepts" class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-          </div>
-        </div>
-
-        <!-- Topic Timeline -->
-        <div>
-          <h4 class="text-xs font-bold uppercase tracking-wider text-purple-400 mb-2 flex items-center gap-1.5">
-            <i data-lucide="clock" class="w-4 h-4"></i> Timestamped Breakdown
-          </h4>
-          <div id="modal-topics" class="space-y-2">
-          </div>
-        </div>
-
-        <!-- Flashcards in this video -->
-        <div>
-          <h4 class="text-xs font-bold uppercase tracking-wider text-amber-400 mb-2 flex items-center gap-1.5">
-            <i data-lucide="layers" class="w-4 h-4"></i> Generated Flashcards
-          </h4>
-          <div id="modal-flashcards" class="space-y-2">
-          </div>
-        </div>
-
-        <!-- Full Synthesis -->
-        <div class="border-t border-dark-700/60 pt-4">
-          <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Comprehensive Synthesis</h4>
-          <p id="modal-synthesis" class="text-slate-300 leading-relaxed text-xs"></p>
-        </div>
-      </div>
-
-      <!-- Modal Footer / Export Triggers -->
-      <div class="p-4 bg-dark-900 border-t border-dark-700 flex flex-wrap items-center justify-between gap-3">
-        <div class="flex items-center gap-2">
-          <button id="modal-export-obsidian-btn" onclick="exportCurrentVideo('obsidian')" class="px-3 py-1.5 rounded-lg bg-dark-700 hover:bg-dark-600 text-xs font-medium text-white flex items-center gap-1.5 transition-colors">
-            <i data-lucide="file-text" class="w-3.5 h-3.5 text-purple-400"></i>
-            Obsidian .md
-          </button>
-          <button id="modal-export-anki-btn" onclick="exportCurrentVideo('anki')" class="px-3 py-1.5 rounded-lg bg-dark-700 hover:bg-dark-600 text-xs font-medium text-white flex items-center gap-1.5 transition-colors">
-            <i data-lucide="repeat" class="w-3.5 h-3.5 text-sky-400"></i>
-            Anki Sync
-          </button>
-          <button id="modal-export-tsv-btn" onclick="downloadCurrentVideoTsv()" class="px-3 py-1.5 rounded-lg bg-dark-700 hover:bg-dark-600 text-xs font-medium text-white flex items-center gap-1.5 transition-colors">
-            <i data-lucide="download" class="w-3.5 h-3.5 text-emerald-400"></i>
-            Anki TSV
-          </button>
-          <button id="modal-export-notion-btn" onclick="exportCurrentVideo('notion')" class="px-3 py-1.5 rounded-lg bg-dark-700 hover:bg-dark-600 text-xs font-medium text-white flex items-center gap-1.5 transition-colors">
-            <i data-lucide="database" class="w-3.5 h-3.5 text-rose-400"></i>
-            Notion
-          </button>
-        </div>
-        <button onclick="closeVideoModal()" class="px-4 py-1.5 rounded-lg bg-dark-700 hover:bg-dark-600 text-xs font-medium text-slate-300">
-          Close
-        </button>
-      </div>
-    </div>
-  </div>
-
   <!-- Manual Video Intake Modal -->
   <div id="capture-modal" class="hidden fixed inset-0 z-50 overflow-y-auto bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
     <div class="bg-dark-800 border border-dark-700 rounded-2xl w-full max-w-lg p-6 shadow-2xl">
       <div class="flex items-center justify-between pb-4 border-b border-dark-700 mb-4">
         <h3 class="text-base font-bold text-white flex items-center gap-2">
           <i data-lucide="plus-circle" class="w-5 h-5 text-brand-400"></i>
-          Capture YouTube Video
+          Transcribe YouTube Video
         </h3>
         <button onclick="closeCaptureModal()" class="text-slate-400 hover:text-white">
           <i data-lucide="x" class="w-5 h-5"></i>
@@ -474,20 +352,9 @@
           <span class="text-[11px] text-slate-500">Supports standard watch links, share links (youtu.be), or 11-char IDs.</span>
         </div>
 
-        <div class="grid grid-cols-2 gap-3">
-          <div>
-            <label class="block text-xs font-medium text-slate-300 mb-1">Watch Time (sec)</label>
-            <input type="number" id="intake-watch-time" value="300" class="w-full bg-dark-900 border border-dark-700 rounded-lg px-3 py-2 text-xs text-white">
-          </div>
-          <div>
-            <label class="block text-xs font-medium text-slate-300 mb-1">Watch %</label>
-            <input type="number" id="intake-watch-pct" value="75" min="0" max="100" class="w-full bg-dark-900 border border-dark-700 rounded-lg px-3 py-2 text-xs text-white">
-          </div>
-        </div>
-
         <div class="flex items-center gap-2 pt-1">
-          <input type="checkbox" id="intake-force" class="rounded bg-dark-900 border-dark-700 text-brand-500 focus:ring-0">
-          <label for="intake-force" class="text-xs text-slate-300 select-none">Force Process (Bypass watch time & entertainment noise checks)</label>
+          <input type="checkbox" id="intake-force" checked class="rounded bg-dark-900 border-dark-700 text-brand-500 focus:ring-0">
+          <label for="intake-force" class="text-xs text-slate-300 select-none">Direct Ingest (Process immediately)</label>
         </div>
 
         <!-- Processing status feedback -->
@@ -496,7 +363,7 @@
             <div class="w-2 h-2 rounded-full bg-brand-500 animate-ping"></div>
             <span id="intake-status-text">Processing pipeline...</span>
           </div>
-          <p class="text-slate-400 text-[11px]">1. Intake & Deduplication → 2. Transcript & Timestamps → 3. AI Recall Synthesis</p>
+          <p class="text-slate-400 text-[11px]">1. Ingesting Video → 2. Extracting & Cleaning Transcript → 3. AI Distilling Crisp Points</p>
         </div>
 
         <div class="pt-2 flex justify-end gap-2">
@@ -504,7 +371,7 @@
             Cancel
           </button>
           <button id="intake-submit-btn" onclick="submitVideoIntake()" class="px-5 py-2 rounded-lg bg-brand-500 hover:bg-brand-600 text-black font-semibold text-xs transition-colors flex items-center gap-2">
-            <span>Process & Learn</span>
+            <span>Transcribe & Distill</span>
           </button>
         </div>
       </div>
@@ -512,7 +379,7 @@
   </div>
 
   <footer class="border-t border-dark-700/80 bg-dark-900 py-6 text-center text-xs text-slate-500">
-    <p>AI Micro-Learning & Spaced Repetition Ecosystem • Designed to run 100% Free</p>
+    <p>YouTube Recall • AI-Powered Crisp Smart Transcripts • 100% Free</p>
   </footer>
 
   <script src="/static/app.js"></script>

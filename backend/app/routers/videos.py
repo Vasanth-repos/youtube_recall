@@ -102,6 +102,7 @@ def process_video_pipeline(db: Session, video_req: VideoIntakeRequest) -> Video:
     video_record.summary_bullets = recall_data.get("summary_bullets", [])
     video_record.key_concepts = recall_data.get("key_concepts", [])
     video_record.topic_notes = recall_data.get("topic_notes", [])
+    video_record.smart_transcript = recall_data.get("smart_transcript", recall_data.get("topic_notes", []))
     video_record.final_summary = recall_data.get("final_summary", "")
 
     db.add(video_record)
@@ -180,3 +181,4 @@ def delete_video(video_id: int, db: Session = Depends(get_db)):
     db.delete(vid)
     db.commit()
     return {"success": True, "message": f"Deleted video '{vid.title}'"}
+

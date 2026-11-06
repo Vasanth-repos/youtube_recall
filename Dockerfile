@@ -20,3 +20,4 @@ COPY frontend/ /app/frontend/
 EXPOSE 8000
 
 CMD ["python", "backend/run.py"]
+

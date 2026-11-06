@@ -103,3 +103,4 @@ class AnkiExporter:
             lines.append(f"{clean_front}\t{clean_back}\t{tags}")
 
         return "\n".join(lines)
+

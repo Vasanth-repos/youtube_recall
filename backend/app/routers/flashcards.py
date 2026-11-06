@@ -105,3 +105,4 @@ def get_system_stats(db: Session = Depends(get_db)):
         cards_mastered=cards_mastered,
         total_reviews_completed=total_reviews
     )
+

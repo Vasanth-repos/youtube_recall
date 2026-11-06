@@ -48,3 +48,4 @@ def update_settings(payload: SettingsUpdate, db: Session = Depends(get_db)):
             db.add(AppSetting(key=key, value=str(value)))
     db.commit()
     return {"success": True, "message": "Settings updated successfully."}
+

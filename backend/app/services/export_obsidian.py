@@ -41,29 +41,33 @@ class ObsidianExporter:
                 md_lines.append(f"- **{concept}**")
             md_lines.append("")
 
-        if video.topic_notes:
-            md_lines.append("## ⏱️ Timestamped Breakdown")
-            for topic in video.topic_notes:
-                ts_label = topic.get("timestamp_label", "00:00")
-                ts_sec = topic.get("timestamp_seconds", 0)
+        # Smart Transcript (Crisp on-to-the-point sections)
+        sections = video.smart_transcript or video.topic_notes
+        if sections:
+            md_lines.append("## 📖 AI Smart Transcript & Crisp Notes")
+            for sec in sections:
+                ts_label = sec.get("timestamp_label", "00:00")
+                ts_sec = sec.get("timestamp_seconds", 0)
                 jump_url = f"https://www.youtube.com/watch?v={video.video_id}&t={ts_sec}s"
-                title = topic.get("title", f"Section at {ts_label}")
-                summary = topic.get("summary", "")
-                md_lines.append(f"### [{ts_label}]({jump_url}) - {title}")
-                md_lines.append(f"{summary}\n")
-                takeaways = topic.get("takeaways", [])
-                if takeaways:
-                    for t in takeaways:
-                        md_lines.append(f"  * {t}")
+                title = sec.get("title", f"Section at {ts_label}")
+                md_lines.append(f"### [{ts_label}]({jump_url}) - {title}\n")
+                
+                crisp_pts = sec.get("crisp_points") or sec.get("takeaways") or []
+                if crisp_pts:
+                    md_lines.append("**Key Takeaways:**")
+                    for p in crisp_pts:
+                        md_lines.append(f"- {p}")
                     md_lines.append("")
 
+                polished = sec.get("polished_text") or sec.get("summary") or ""
+                if polished:
+                    md_lines.append(f"> {polished}\n")
+
         if video.flashcards:
-            md_lines.append("## 🃏 Active Recall Flashcards")
-            md_lines.append("> Compatible with Obsidian Spaced Repetition plugin (`#flashcards`)\n")
+            md_lines.append("## 🃏 Active Recall Q&A")
             for card in video.flashcards:
                 ts_label = card.timestamp_label or "00:00"
                 jump_url = f"https://www.youtube.com/watch?v={video.video_id}&t={card.timestamp_seconds or 0}s"
-                # Obsidian Spaced Repetition inline format: Question::Answer
                 md_lines.append(f"**Q:** {card.question} ([{ts_label}]({jump_url}))")
                 md_lines.append(f"?\n**A:** {card.answer}\n")
 
@@ -95,3 +99,4 @@ class ObsidianExporter:
             "path": str(file_path),
             "content": content
         }
+

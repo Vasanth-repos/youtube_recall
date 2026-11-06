@@ -24,3 +24,18 @@ def get_db():
 def init_db():
     from backend.app import models  # noqa
     Base.metadata.create_all(bind=engine)
+    
+    # Safe migration for new columns in SQLite
+    try:
+        with engine.connect() as conn:
+            conn.execute(models.Base.metadata.tables["videos"].columns.keys()) # check
+    except Exception:
+        pass
+
+    try:
+        with engine.connect() as conn:
+            conn.execute(__import__("sqlalchemy").text("ALTER TABLE videos ADD COLUMN smart_transcript_json TEXT DEFAULT '[]'"))
+            conn.commit()
+    except Exception:
+        pass # column already exists
+

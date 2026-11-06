@@ -53,3 +53,4 @@ if FRONTEND_DIR.exists():
         if index_file.exists():
             return FileResponse(index_file)
         return {"message": "Frontend index.html not found"}
+

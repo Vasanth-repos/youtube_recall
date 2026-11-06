@@ -16,3 +16,4 @@ services:
       - ./data:/app/backend/data
       - ./exports:/app/exports
     restart: unless-stopped
+
