@@ -30,6 +30,19 @@
     return document.title.replace(" - YouTube", "").trim();
   }
 
+  // Safe wrapper for chrome.runtime.sendMessage to prevent unhandled rejection / context invalidation errors
+  function safeSendMessage(msg, cb) {
+    if (typeof chrome === "undefined" || !chrome.runtime || !chrome.runtime.id) {
+      return;
+    }
+    try {
+      chrome.runtime.sendMessage(msg, (response) => {
+        const err = chrome.runtime.lastError;
+        if (cb) cb(response, err);
+      });
+    } catch (e) {}
+  }
+
   // Load previously processed video IDs from chrome storage
   if (chrome.storage && chrome.storage.local) {
     chrome.storage.local.get(["processed_videos"], (res) => {
@@ -99,7 +112,7 @@
       </div>
     `, false, 0);
 
-    chrome.runtime.sendMessage({
+    safeSendMessage({
       action: "intake_video",
       payload: {
         video_url_or_id: videoId,
@@ -108,10 +121,9 @@
         force_process: true,
         watched_at: new Date().toISOString()
       }
-    }, (response) => {
+    }, (response, err) => {
       isTranscribing = false;
-      if (chrome.runtime.lastError) {
-        console.warn("YouTube Recall background communication notice:", chrome.runtime.lastError.message);
+      if (err) {
         updateButtonState("offline");
         showToast(`<span>❌ Backend offline or extension reloading</span>`, false, 4000);
         return;
@@ -263,7 +275,7 @@
     }
 
     if (avatarUrl || accountName) {
-      chrome.runtime.sendMessage({
+      safeSendMessage({
         action: "update_account_info",
         account_info: {
           account_name: accountName || "YouTube User",
@@ -310,7 +322,7 @@
       btn.addEventListener("click", () => {
         btn.disabled = true;
         btn.innerHTML = "<span>⏳ Syncing History...</span>";
-        chrome.runtime.sendMessage({ action: "manual_history_sync", maxCount: 40 }, (res) => {
+        safeSendMessage({ action: "manual_history_sync", maxCount: 40 }, (res) => {
           btn.disabled = false;
           if (res && res.success) {
             btn.innerHTML = `<span>✓ Synced ${res.newly_synced} New Videos!</span>`;
@@ -343,14 +355,12 @@
     hasAutoTriggered = false;
     const vid = getVideoId();
     if (vid) {
-      try {
-        chrome.runtime.sendMessage({
-          action: "auto_sync_video",
-          videoId: vid,
-          title: getVideoTitle(),
-          watched_at: new Date().toISOString()
-        });
-      } catch (e) {}
+      safeSendMessage({
+        action: "auto_sync_video",
+        videoId: vid,
+        title: getVideoTitle(),
+        watched_at: new Date().toISOString()
+      });
     }
     setTimeout(injectSaveButton, 600);
     setTimeout(detectAndReportAccount, 1000);
@@ -360,13 +370,11 @@
   // Initial check on script load
   const initialVid = getVideoId();
   if (initialVid) {
-    try {
-      chrome.runtime.sendMessage({
-        action: "auto_sync_video",
-        videoId: initialVid,
-        title: getVideoTitle(),
-        watched_at: new Date().toISOString()
-      });
-    } catch (e) {}
+    safeSendMessage({
+      action: "auto_sync_video",
+      videoId: initialVid,
+      title: getVideoTitle(),
+      watched_at: new Date().toISOString()
+    });
   }
 })();

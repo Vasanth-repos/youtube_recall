@@ -34,6 +34,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   if (!isServerOnline) {
     chrome.runtime.sendMessage({ action: "check_health" }, (resp) => {
+      const err = chrome.runtime.lastError;
       if (resp && resp.online) {
         serverStatus.textContent = "Server Online";
         serverStatus.className = "status-pill";
@@ -91,13 +92,14 @@ document.addEventListener("DOMContentLoaded", async () => {
     syncStatus.textContent = "Fetching videos from your YouTube watch history...";
 
     chrome.runtime.sendMessage({ action: "manual_history_sync", maxCount: 30 }, (res) => {
+      const err = chrome.runtime.lastError;
       syncBtn.disabled = false;
       syncBtn.innerHTML = "<span>⚡ Sync YouTube Watch History</span>";
 
       if (res && res.success) {
         syncStatus.innerHTML = `<span style="color: #4ade80; font-weight: 600;">✓ Synced ${res.newly_synced} new video(s)!</span> (${res.already_synced} already in library)`;
       } else {
-        syncStatus.innerHTML = `<span style="color: #f87171;">⚠️ Sync failed: ${res ? res.error : "Server offline"}</span>`;
+        syncStatus.innerHTML = `<span style="color: #f87171;">⚠️ Sync notice: ${res && res.error ? res.error : "Server reconnecting"}</span>`;
       }
     });
   });

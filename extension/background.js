@@ -40,10 +40,12 @@ async function getFromBackend(endpoint) {
 
 // Initialize periodic sync alarm on extension load & startup
 chrome.runtime.onInstalled.addListener(() => {
-  chrome.alarms.create(ALARM_NAME, {
-    periodInMinutes: SYNC_INTERVAL_MINUTES,
-    delayInMinutes: 0.1
-  });
+  try {
+    chrome.alarms.create(ALARM_NAME, {
+      periodInMinutes: SYNC_INTERVAL_MINUTES,
+      delayInMinutes: 1
+    });
+  } catch (e) {}
   console.log("YouTube Recall background auto-sync worker initialized.");
   syncYouTubeHistory(25).catch(() => {});
 });
@@ -55,9 +57,7 @@ chrome.runtime.onStartup.addListener(() => {
 // Periodic sync alarm handler (every 2 minutes)
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === ALARM_NAME) {
-    syncYouTubeHistory(20).catch((err) => {
-      console.warn("Background auto-sync failed:", err);
-    });
+    syncYouTubeHistory(20).catch(() => {});
   }
 });
 
@@ -112,7 +112,7 @@ async function autoSyncVideo(videoId, title, visitedTime) {
       }
     }
   } catch (err) {
-    console.warn(`[YouTube Recall] Auto-sync failed for ${videoId}:`, err);
+    console.log(`[YouTube Recall] Auto-sync skipped or queued for ${videoId}:`, err ? err.message : err);
   }
 }
 
@@ -213,8 +213,11 @@ async function syncYouTubeHistory(maxResults = 25) {
               ...data
             });
           } catch (fetchErr) {
-            console.warn("YouTube Recall Backend server unreachable:", fetchErr);
-            reject(fetchErr);
+            console.log("[YouTube Recall] Backend server notice:", fetchErr ? fetchErr.message : fetchErr);
+            resolve({
+              success: false,
+              message: "Backend server temporarily unreachable at localhost:8000"
+            });
           }
         });
       }
