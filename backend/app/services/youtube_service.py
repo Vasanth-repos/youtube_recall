@@ -19,7 +19,7 @@ class YouTubeService:
             return text
         
         patterns = [
-            r"(?:v=|\/v\/|youtu\.be\/|embed\/|\/watch\?v=|\/shorts\/)([a-zA-Z0-9_-]{11})",
+            r"(?:v=|\/v\/|youtu\.be\/|embed\/|\/watch\?v=|\/shorts\/|\/live\/)([a-zA-Z0-9_-]{11})",
             r"[?&]v=([a-zA-Z0-9_-]{11})"
         ]
         for pattern in patterns:

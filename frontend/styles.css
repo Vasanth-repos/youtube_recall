@@ -135,6 +135,15 @@ html {
   transform: translateY(-1px);
 }
 
+#active-flashcard-box {
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+#active-flashcard-box:hover {
+  border-color: rgba(245, 158, 11, 0.3);
+  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
+}
+
 /* Input Focus Ring */
 input:focus, select:focus {
   outline: none;

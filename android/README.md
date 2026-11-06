@@ -55,3 +55,4 @@ cd android
 ```
 
 The APK will be compiled to `android/app/build/outputs/apk/debug/app-debug.apk`.
+

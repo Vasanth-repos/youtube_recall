@@ -24,3 +24,4 @@ class WebAppInterface(private val context: Context) {
         return true
     }
 }
+

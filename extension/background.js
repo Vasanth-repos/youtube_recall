@@ -70,7 +70,13 @@ function extractVideoId(url) {
       return u.searchParams.get("v");
     }
     if (u.hostname.includes("youtu.be")) {
-      return u.pathname.slice(1);
+      return u.pathname.slice(1).split("?")[0].slice(0, 11);
+    }
+    if (u.pathname.includes("/shorts/")) {
+      return u.pathname.split("/shorts/")[1].split("?")[0].slice(0, 11);
+    }
+    if (u.pathname.includes("/live/")) {
+      return u.pathname.split("/live/")[1].split("?")[0].slice(0, 11);
     }
   } catch (e) {}
   return null;
@@ -118,7 +124,7 @@ async function autoSyncVideo(videoId, title, visitedTime) {
 
 // 1. Instant trigger on Chrome browsing history visits
 chrome.history.onVisited.addListener((historyItem) => {
-  if (historyItem.url && (historyItem.url.includes("youtube.com/watch") || historyItem.url.includes("youtu.be/"))) {
+  if (historyItem.url && (historyItem.url.includes("youtube.com/watch") || historyItem.url.includes("youtu.be/") || historyItem.url.includes("youtube.com/shorts/") || historyItem.url.includes("youtube.com/live/"))) {
     const videoId = extractVideoId(historyItem.url);
     if (videoId) {
       autoSyncVideo(videoId, historyItem.title, historyItem.lastVisitTime);
@@ -129,7 +135,7 @@ chrome.history.onVisited.addListener((historyItem) => {
 // 2. Instant trigger on active tab URL updates / navigation
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   const targetUrl = changeInfo.url || tab.url;
-  if (targetUrl && (targetUrl.includes("youtube.com/watch") || targetUrl.includes("youtu.be/"))) {
+  if (targetUrl && (targetUrl.includes("youtube.com/watch") || targetUrl.includes("youtu.be/") || targetUrl.includes("youtube.com/shorts/") || targetUrl.includes("youtube.com/live/"))) {
     const videoId = extractVideoId(targetUrl);
     if (videoId) {
       autoSyncVideo(videoId, tab.title);

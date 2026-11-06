@@ -13,7 +13,11 @@
 
   function getVideoId() {
     const urlParams = new URLSearchParams(window.location.search);
-    return urlParams.get("v");
+    if (urlParams.has("v")) return urlParams.get("v");
+    const path = window.location.pathname;
+    if (path.includes("/shorts/")) return path.split("/shorts/")[1].split("/")[0].slice(0, 11);
+    if (path.includes("/live/")) return path.split("/live/")[1].split("/")[0].slice(0, 11);
+    return null;
   }
 
   function getVideoPlayer() {

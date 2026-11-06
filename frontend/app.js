@@ -86,8 +86,10 @@ async function handleIncomingShareTarget() {
 }
 
 // Navigation Tabs (Syncs Desktop Top Nav and Mobile Bottom Nav)
+let activePracticeVideoId = null;
+
 function switchTab(tab) {
-  const tabs = ["library", "reader", "settings"];
+  const tabs = ["library", "reader", "practice", "settings"];
   tabs.forEach(t => {
     const el = document.getElementById(`tab-${t}`);
     const deskBtn = document.getElementById(`nav-${t}-btn`);
@@ -108,18 +110,65 @@ function switchTab(tab) {
     renderReaderView(currentViewingVideo);
   } else if (tab === "library") {
     loadVideos();
+  } else if (tab === "practice") {
+    startFlashcardSession(activePracticeVideoId);
   }
 }
 
-// Fetch & Update Stats
+// Fetch & Update System & Spaced Repetition Stats
 async function loadStats() {
   try {
-    const res = await fetch("/api/videos");
-    if (!res.ok) return;
-    const vids = await res.json();
-    
-    const el = document.getElementById("stat-videos");
-    if (el) el.textContent = vids.length;
+    const [vidRes, statRes] = await Promise.all([
+      fetch("/api/videos"),
+      fetch("/api/flashcards/stats")
+    ]);
+
+    if (vidRes.ok) {
+      const vids = await vidRes.json();
+      const el = document.getElementById("stat-videos");
+      if (el) el.textContent = vids.length;
+    }
+
+    if (statRes.ok) {
+      const stats = await statRes.json();
+      const dueCount = stats.cards_due_today || 0;
+      const masteredCount = stats.cards_mastered || 0;
+      const reviewsCount = stats.total_reviews || 0;
+
+      // Update overview strip
+      const dueEl = document.getElementById("stat-cards-due");
+      if (dueEl) dueEl.textContent = dueCount;
+      const mastEl = document.getElementById("stat-cards-mastered");
+      if (mastEl) mastEl.textContent = masteredCount;
+      const revEl = document.getElementById("stat-total-reviews");
+      if (revEl) revEl.textContent = reviewsCount;
+
+      // Update practice header metrics
+      const mDue = document.getElementById("metric-due-count");
+      if (mDue) mDue.textContent = dueCount;
+      const mMast = document.getElementById("metric-mastered-count");
+      if (mMast) mMast.textContent = masteredCount;
+      const mRev = document.getElementById("metric-reviews-count");
+      if (mRev) mRev.textContent = reviewsCount;
+
+      // Update navigation badges
+      const navBadge = document.getElementById("nav-due-badge");
+      const mobBadge = document.getElementById("mob-due-badge");
+
+      if (dueCount > 0) {
+        if (navBadge) {
+          navBadge.textContent = dueCount;
+          navBadge.classList.remove("hidden");
+        }
+        if (mobBadge) {
+          mobBadge.textContent = dueCount;
+          mobBadge.classList.remove("hidden");
+        }
+      } else {
+        if (navBadge) navBadge.classList.add("hidden");
+        if (mobBadge) mobBadge.classList.add("hidden");
+      }
+    }
   } catch (e) {
     console.error("Failed to load stats:", e);
   }
@@ -689,3 +738,217 @@ async function syncYouTubeHistoryFromUI() {
     }, 2500);
   }
 }
+
+// ==========================================================================
+// Spaced Repetition Flashcards & Active Recall Practice Session Engine
+// ==========================================================================
+
+let activeFlashcards = [];
+let currentCardIndex = 0;
+let isAnswerRevealed = false;
+let cardStartTime = null;
+
+async function startFlashcardSession(filterVideoId = null) {
+  const container = document.getElementById("flashcard-study-container");
+  const empty = document.getElementById("flashcard-empty-state");
+  const statusChip = document.getElementById("practice-status-chip");
+
+  try {
+    let url = "/api/flashcards/due";
+    if (filterVideoId) {
+      url = `/api/flashcards/all?limit=100`;
+    }
+
+    const res = await fetch(url);
+    if (!res.ok) throw new Error("Could not load flashcards");
+    let cards = await res.json();
+
+    if (filterVideoId) {
+      cards = cards.filter(c => c.video_id === filterVideoId);
+      if (statusChip) statusChip.textContent = "Filtered by Video";
+    } else {
+      if (statusChip) statusChip.textContent = "Due Review Session";
+    }
+
+    activeFlashcards = cards;
+    currentCardIndex = 0;
+
+    if (!cards || cards.length === 0) {
+      if (container) container.classList.add("hidden");
+      if (empty) empty.classList.remove("hidden");
+      loadStats();
+      return;
+    }
+
+    if (container) container.classList.remove("hidden");
+    if (empty) empty.classList.add("hidden");
+    renderCurrentCard();
+    loadStats();
+  } catch (e) {
+    console.error("Failed to load flashcard practice session:", e);
+  }
+}
+
+async function loadAllCardsSession() {
+  const statusChip = document.getElementById("practice-status-chip");
+  if (statusChip) statusChip.textContent = "All Cards Review";
+  
+  try {
+    const res = await fetch("/api/flashcards/all?limit=100");
+    if (!res.ok) return;
+    const cards = await res.json();
+    activeFlashcards = cards;
+    currentCardIndex = 0;
+
+    const container = document.getElementById("flashcard-study-container");
+    const empty = document.getElementById("flashcard-empty-state");
+
+    if (cards.length > 0) {
+      if (container) container.classList.remove("hidden");
+      if (empty) empty.classList.add("hidden");
+      renderCurrentCard();
+    }
+  } catch (e) {
+    console.error("Failed to load all cards:", e);
+  }
+}
+
+function renderCurrentCard() {
+  if (!activeFlashcards || activeFlashcards.length === 0 || currentCardIndex >= activeFlashcards.length) {
+    const container = document.getElementById("flashcard-study-container");
+    const empty = document.getElementById("flashcard-empty-state");
+    if (container) container.classList.add("hidden");
+    if (empty) empty.classList.remove("hidden");
+    loadStats();
+    return;
+  }
+
+  const card = activeFlashcards[currentCardIndex];
+  isAnswerRevealed = false;
+  cardStartTime = Date.now();
+
+  // Progress counter
+  const progressEl = document.getElementById("card-progress-counter");
+  if (progressEl) progressEl.textContent = `Card ${currentCardIndex + 1} of ${activeFlashcards.length}`;
+
+  // Video title & jump
+  const titleEl = document.getElementById("card-video-title");
+  if (titleEl) titleEl.textContent = card.video_title || (currentViewingVideo ? currentViewingVideo.title : "YouTube Recall");
+
+  const jumpBtn = document.getElementById("card-yt-jump-btn");
+  const tsLabel = document.getElementById("card-ts-label");
+  const tsSeconds = card.timestamp_seconds || 0;
+  const label = card.timestamp_label || "00:00";
+  
+  if (tsLabel) tsLabel.textContent = label;
+  if (jumpBtn) {
+    const vId = card.video ? card.video.video_id : (currentViewingVideo ? currentViewingVideo.video_id : "");
+    jumpBtn.href = vId ? `https://www.youtube.com/watch?v=${vId}&t=${tsSeconds}s` : "#";
+  }
+
+  // Interval badge
+  const intervalEl = document.getElementById("card-interval-badge");
+  if (intervalEl) {
+    intervalEl.textContent = `Interval: ${card.interval_days || 0}d (Reps: ${card.repetition_count || 0})`;
+  }
+
+  // Question & Answer text
+  const qEl = document.getElementById("card-question-text");
+  if (qEl) qEl.textContent = card.question;
+
+  const aEl = document.getElementById("card-answer-text");
+  if (aEl) aEl.textContent = card.answer;
+
+  // View state: Front of card
+  const ansWrapper = document.getElementById("card-answer-wrapper");
+  const btnReveal = document.getElementById("btn-reveal-answer");
+  const ratingGroup = document.getElementById("rating-buttons-group");
+
+  if (ansWrapper) ansWrapper.classList.add("hidden");
+  if (btnReveal) btnReveal.classList.remove("hidden");
+  if (ratingGroup) ratingGroup.classList.add("hidden");
+
+  if (window.lucide) lucide.createIcons();
+}
+
+function flipCurrentCard() {
+  if (isAnswerRevealed) return;
+  isAnswerRevealed = true;
+
+  const ansWrapper = document.getElementById("card-answer-wrapper");
+  const btnReveal = document.getElementById("btn-reveal-answer");
+  const ratingGroup = document.getElementById("rating-buttons-group");
+
+  if (ansWrapper) ansWrapper.classList.remove("hidden");
+  if (btnReveal) btnReveal.classList.add("hidden");
+  if (ratingGroup) ratingGroup.classList.remove("hidden");
+
+  if (window.lucide) lucide.createIcons();
+}
+
+async function rateCurrentCard(rating) {
+  if (!activeFlashcards || currentCardIndex >= activeFlashcards.length) return;
+  const card = activeFlashcards[currentCardIndex];
+  const timeTaken = cardStartTime ? (Date.now() - cardStartTime) : 1000;
+
+  try {
+    await fetch(`/api/flashcards/${card.id}/review`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        rating: rating,
+        time_taken_ms: timeTaken
+      })
+    });
+
+    currentCardIndex += 1;
+    renderCurrentCard();
+    loadStats();
+  } catch (e) {
+    console.error("Failed to submit card review:", e);
+    currentCardIndex += 1;
+    renderCurrentCard();
+  }
+}
+
+function practiceCardsForCurrentVideo() {
+  if (!currentViewingVideo) return;
+  activePracticeVideoId = currentViewingVideo.id;
+  switchTab("practice");
+}
+
+function downloadReaderAnki() {
+  if (!currentViewingVideo) return;
+  window.location.href = `/api/export/anki/${currentViewingVideo.id}/download`;
+}
+
+// Global Keyboard Navigation for Study Sessions
+window.addEventListener("keydown", (e) => {
+  // Only trigger if practice tab is active
+  const practiceTab = document.getElementById("tab-practice");
+  if (!practiceTab || practiceTab.classList.contains("hidden")) return;
+
+  // Ignore if user is typing in an input
+  if (["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement.tagName)) return;
+
+  if (e.code === "Space") {
+    e.preventDefault();
+    if (!isAnswerRevealed) {
+      flipCurrentCard();
+    }
+  } else if (isAnswerRevealed) {
+    if (e.key === "1") {
+      e.preventDefault();
+      rateCurrentCard("AGAIN");
+    } else if (e.key === "2") {
+      e.preventDefault();
+      rateCurrentCard("HARD");
+    } else if (e.key === "3") {
+      e.preventDefault();
+      rateCurrentCard("GOOD");
+    } else if (e.key === "4") {
+      e.preventDefault();
+      rateCurrentCard("EASY");
+    }
+  }
+});

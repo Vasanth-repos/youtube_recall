@@ -246,6 +246,31 @@ def run_e2e_tests():
     assert (ext_dir / "popup.js").exists(), "popup.js missing"
     print("  ✓ Chrome Extension Manifest V3, background service worker, and all scripts verified")
 
+    # -------------------------------------------------------------
+    # STEP 10: Mobile PWA & Native Android Application Integrity
+    # -------------------------------------------------------------
+    print("\n[STEP 10] Testing Mobile PWA & Native Android Pipeline...")
+    res = client.get("/manifest.webmanifest")
+    assert res.status_code == 200
+    pwa_data = res.json()
+    assert "share_target" in pwa_data
+    print("  ✓ PWA Web App Manifest verified with Share Target API")
+
+    res = client.get("/sw.js")
+    assert res.status_code == 200
+    print("  ✓ Service Worker (/sw.js) delivered for offline PWA caching")
+
+    res = client.get("/api/download/android-apk")
+    assert res.status_code == 200
+    assert "application/vnd.android.package-archive" in res.headers.get("content-type", "")
+    print(f"  ✓ Native Android APK download verified ({len(res.content)} bytes)")
+
+    android_dir = ROOT_DIR / "android"
+    assert (android_dir / "app" / "src" / "main" / "AndroidManifest.xml").exists()
+    assert (android_dir / "app" / "src" / "main" / "java" / "com" / "youtuberecall" / "app" / "MainActivity.kt").exists()
+    assert (android_dir / "youtube-recall.apk").exists()
+    print("  ✓ Native Android Studio project structure & compiled APK verified")
+
     print("\n=================================================================")
     print("  🎉 ALL END-TO-END TESTS COMPLETED AND VERIFIED 100% PASSING!  ")
     print("=================================================================")

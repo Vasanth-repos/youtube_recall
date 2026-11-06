@@ -6,3 +6,4 @@
     <string name="retry">Retry Connection</string>
     <string name="offline_msg">Backend server not reachable at %s. Ensure the Python server is running and your device is on the same Wi-Fi.</string>
 </resources>
+
