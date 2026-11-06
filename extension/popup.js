@@ -27,6 +27,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         serverStatus.className = "status-pill";
         isServerOnline = true;
         activeServerUrl = candidate;
+        const dashLink = document.getElementById("open-dashboard-link");
+        if (dashLink) dashLink.href = candidate;
         break;
       }
     } catch (e) {}

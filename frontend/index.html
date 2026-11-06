@@ -19,6 +19,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Newsreader:ital,opsz,wght@0,6..72,400..600;1,6..72,400&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
@@ -63,7 +64,7 @@
     <div class="max-w-5xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
       
       <!-- Brand Logotype -->
-      <div class="flex items-center gap-3 cursor-pointer" onclick="switchTab('library')">
+      <div class="flex items-center gap-3 cursor-pointer select-none" onclick="switchTab('library')">
         <div class="w-8 h-8 rounded-lg bg-obsidian-850 border border-obsidian-700/80 flex items-center justify-center text-amber-400 font-serif font-semibold text-lg shadow-sm">
           R
         </div>
@@ -94,14 +95,14 @@
         <button id="nav-practice-btn" onclick="switchTab('practice')" class="nav-tab flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs sm:text-sm font-medium transition-colors relative">
           <i data-lucide="brain" class="w-3.5 h-3.5"></i>
           <span>Practice</span>
-          <span id="nav-due-badge" class="hidden px-1.5 py-0.2 rounded-full text-[10px] font-mono bg-amber-500 text-zinc-950 font-bold leading-tight">0</span>
+          <span id="nav-due-badge" class="hidden px-1.5 py-0.5 rounded-full text-[10px] font-mono bg-amber-500 text-zinc-950 font-bold leading-tight">0</span>
         </button>
         <button id="nav-settings-btn" onclick="switchTab('settings')" class="nav-tab flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs sm:text-sm font-medium transition-colors">
           <i data-lucide="sliders" class="w-3.5 h-3.5"></i>
           <span>Settings</span>
         </button>
 
-        <button onclick="openCaptureModal()" class="ml-2 flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold bg-amber-500 hover:bg-amber-400 text-zinc-950 transition-colors shadow-sm">
+        <button onclick="openCaptureModal()" class="ml-2 flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold bg-amber-500 hover:bg-amber-400 text-zinc-950 transition-colors shadow-sm active:scale-95">
           <i data-lucide="plus" class="w-3.5 h-3.5 stroke-[2.5]"></i>
           <span>Add Video</span>
         </button>
@@ -121,7 +122,7 @@
   </header>
 
   <!-- Main Content Area -->
-  <main class="flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 py-5 sm:py-8 pb-28 sm:pb-12">
+  <main class="flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 py-5 sm:py-8 pb-32 sm:pb-12">
 
     <!-- TAB 1: Library View -->
     <div id="tab-library" class="space-y-6">
@@ -153,12 +154,12 @@
       <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-1">
         <!-- Search Input -->
         <div class="relative flex-1 max-w-md">
-          <i data-lucide="search" class="w-3.5 h-3.5 absolute left-3 top-3 text-zinc-500"></i>
-          <input type="text" id="search-input" onkeyup="handleSearch()" placeholder="Search notes or transcripts..." class="w-full bg-obsidian-900 border border-obsidian-750 rounded-lg pl-8.5 pr-4 py-2 text-xs sm:text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none transition-colors">
+          <i data-lucide="search" class="w-4 h-4 absolute left-3 top-2.5 text-zinc-500"></i>
+          <input type="text" id="search-input" onkeyup="handleSearch()" placeholder="Search notes or transcripts..." class="w-full bg-obsidian-900 border border-obsidian-750 rounded-lg pl-9 pr-4 py-2 text-xs sm:text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none transition-colors">
         </div>
 
         <!-- Filter Pills & Sorter -->
-        <div class="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0 text-xs">
+        <div class="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0 text-xs scrollbar-none">
           <button onclick="filterCategory('')" class="category-pill active px-3 py-1.5 rounded-md text-zinc-300 border border-obsidian-750 bg-obsidian-900 transition-colors">All</button>
           <button onclick="filterCategory('Tech')" class="category-pill px-3 py-1.5 rounded-md text-zinc-400 border border-obsidian-750 bg-obsidian-900 transition-colors">Tech</button>
           <button onclick="filterCategory('Science')" class="category-pill px-3 py-1.5 rounded-md text-zinc-400 border border-obsidian-750 bg-obsidian-900 transition-colors">Science</button>
@@ -197,7 +198,7 @@
         <p class="text-xs text-zinc-500 max-w-sm mx-auto mb-4">
           Videos you watch on YouTube are automatically captured and distilled here.
         </p>
-        <button onclick="openCaptureModal()" class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-md bg-amber-500 text-zinc-950 font-semibold text-xs hover:bg-amber-400 transition-colors">
+        <button onclick="openCaptureModal()" class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-md bg-amber-500 text-zinc-950 font-semibold text-xs hover:bg-amber-400 transition-colors shadow-sm">
           <i data-lucide="plus" class="w-3.5 h-3.5 stroke-[2.5]"></i>
           Add Video Link
         </button>
@@ -207,112 +208,115 @@
     <!-- TAB 2: AI Smart Transcript Reader -->
     <div id="tab-reader" class="hidden space-y-6">
       
-      <!-- Video Header Card (Editorial Publication Style) -->
-      <div class="bg-obsidian-900 border border-obsidian-800 rounded-xl p-6 sm:p-7 shadow-sm space-y-4">
-        <!-- Metadata Row -->
-        <div class="flex flex-wrap items-center justify-between gap-3 text-xs text-zinc-400">
-          <div class="flex items-center gap-2">
-            <span id="reader-category" class="font-mono text-[10px] tracking-wider uppercase px-2 py-0.5 rounded bg-obsidian-800 text-zinc-300 border border-obsidian-700">Category</span>
-            <span class="text-zinc-600">•</span>
-            <span id="reader-duration" class="font-mono text-zinc-400">00:00</span>
-          </div>
-          <div class="flex items-center gap-1.5 text-xs text-zinc-400">
-            <span class="text-zinc-500">By</span>
-            <span id="reader-channel" class="font-medium text-zinc-300">Channel Name</span>
-          </div>
-        </div>
-
-        <!-- Video Title (Literary Serif) -->
-        <h1 id="reader-title" class="font-serif text-2xl sm:text-3xl font-medium text-zinc-100 tracking-tight leading-snug">
-          Select a video to read its smart transcript
-        </h1>
-
-        <!-- Streamlined Action Toolbar -->
-        <div class="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-obsidian-800">
-          <div class="flex flex-wrap items-center gap-2">
-            <button onclick="copyCrispPoints()" class="px-3 py-1.5 rounded-md bg-amber-500 hover:bg-amber-400 text-xs font-semibold text-zinc-950 flex items-center gap-1.5 transition-colors shadow-sm">
-              <i data-lucide="copy" class="w-3.5 h-3.5"></i>
-              <span id="copy-points-text">Copy Notes</span>
-            </button>
-            <button onclick="practiceCardsForCurrentVideo()" title="Practice flashcards generated for this video" class="px-3 py-1.5 rounded-md bg-obsidian-850 hover:bg-obsidian-800 text-xs font-medium text-amber-400 hover:text-amber-300 flex items-center gap-1.5 transition-colors border border-amber-500/30">
-              <i data-lucide="brain" class="w-3.5 h-3.5 text-amber-400"></i>
-              <span>Practice Cards</span>
-            </button>
-            <button onclick="downloadReaderMarkdown()" title="Download as Markdown (.md)" class="px-3 py-1.5 rounded-md bg-obsidian-850 hover:bg-obsidian-800 text-xs font-medium text-zinc-300 hover:text-white flex items-center gap-1.5 transition-colors border border-obsidian-750">
-              <i data-lucide="download" class="w-3.5 h-3.5"></i>
-              <span>Export .md</span>
-            </button>
-            <button onclick="downloadReaderAnki()" title="Download ready-to-import Anki Deck (.tsv)" class="px-3 py-1.5 rounded-md bg-obsidian-850 hover:bg-obsidian-800 text-xs font-medium text-zinc-300 hover:text-white flex items-center gap-1.5 transition-colors border border-obsidian-750">
-              <i data-lucide="layers" class="w-3.5 h-3.5 text-sky-400"></i>
-              <span>Export Anki</span>
-            </button>
-            <a id="reader-yt-link" href="#" target="_blank" title="Watch on YouTube" class="px-3 py-1.5 rounded-md bg-obsidian-850 hover:bg-obsidian-800 text-xs font-medium text-zinc-300 hover:text-white flex items-center gap-1.5 transition-colors border border-obsidian-750">
-              <i data-lucide="external-link" class="w-3.5 h-3.5 text-red-400"></i>
-              <span>YouTube</span>
-            </a>
+      <!-- Populated Reader Container -->
+      <div id="reader-content" class="space-y-6">
+        <!-- Video Header Card (Editorial Publication Style) -->
+        <div class="bg-obsidian-900 border border-obsidian-800 rounded-xl p-5 sm:p-7 shadow-sm space-y-4">
+          <!-- Metadata Row -->
+          <div class="flex flex-wrap items-center justify-between gap-3 text-xs text-zinc-400">
+            <div class="flex items-center gap-2">
+              <span id="reader-category" class="font-mono text-[10px] tracking-wider uppercase px-2 py-0.5 rounded bg-obsidian-800 text-zinc-300 border border-obsidian-700">Category</span>
+              <span class="text-zinc-600">•</span>
+              <span id="reader-duration" class="font-mono text-zinc-400">00:00</span>
+            </div>
+            <div class="flex items-center gap-1.5 text-xs text-zinc-400">
+              <span class="text-zinc-500">By</span>
+              <span id="reader-channel" class="font-medium text-zinc-300">Channel Name</span>
+            </div>
           </div>
 
-          <!-- Secondary Actions -->
-          <div class="flex items-center gap-2">
-            <button onclick="redistillCurrentVideo()" title="Clean and re-distill transcript" class="px-2.5 py-1.5 rounded-md bg-obsidian-850 hover:bg-obsidian-800 text-xs text-zinc-400 hover:text-amber-400 flex items-center gap-1 transition-colors border border-obsidian-750">
-              <i data-lucide="refresh-cw" class="w-3 h-3"></i>
-              <span id="redistill-btn-text">Re-distill</span>
-            </button>
+          <!-- Video Title (Literary Serif) -->
+          <h1 id="reader-title" class="font-serif text-2xl sm:text-3xl font-medium text-zinc-100 tracking-tight leading-snug">
+            Select a video to read its smart transcript
+          </h1>
+
+          <!-- Streamlined Action Toolbar -->
+          <div class="flex flex-wrap items-center justify-between gap-2.5 pt-3 border-t border-obsidian-800">
+            <div class="flex flex-wrap items-center gap-2">
+              <button onclick="copyCrispPoints()" class="px-3 py-1.5 rounded-md bg-amber-500 hover:bg-amber-400 text-xs font-semibold text-zinc-950 flex items-center gap-1.5 transition-colors shadow-sm active:scale-95">
+                <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                <span id="copy-points-text">Copy Notes</span>
+              </button>
+              <button onclick="practiceCardsForCurrentVideo()" title="Practice flashcards generated for this video" class="px-3 py-1.5 rounded-md bg-obsidian-850 hover:bg-obsidian-800 text-xs font-medium text-amber-400 hover:text-amber-300 flex items-center gap-1.5 transition-colors border border-amber-500/30 active:scale-95">
+                <i data-lucide="brain" class="w-3.5 h-3.5 text-amber-400"></i>
+                <span>Practice Cards</span>
+              </button>
+              <button onclick="downloadReaderMarkdown()" title="Download as Markdown (.md)" class="px-3 py-1.5 rounded-md bg-obsidian-850 hover:bg-obsidian-800 text-xs font-medium text-zinc-300 hover:text-white flex items-center gap-1.5 transition-colors border border-obsidian-750 active:scale-95">
+                <i data-lucide="download" class="w-3.5 h-3.5"></i>
+                <span>Export .md</span>
+              </button>
+              <button onclick="downloadReaderAnki()" title="Download ready-to-import Anki Deck (.tsv)" class="px-3 py-1.5 rounded-md bg-obsidian-850 hover:bg-obsidian-800 text-xs font-medium text-zinc-300 hover:text-white flex items-center gap-1.5 transition-colors border border-obsidian-750 active:scale-95">
+                <i data-lucide="layers" class="w-3.5 h-3.5 text-sky-400"></i>
+                <span>Export Anki</span>
+              </button>
+              <a id="reader-yt-link" href="#" target="_blank" title="Watch on YouTube" class="px-3 py-1.5 rounded-md bg-obsidian-850 hover:bg-obsidian-800 text-xs font-medium text-zinc-300 hover:text-white flex items-center gap-1.5 transition-colors border border-obsidian-750 active:scale-95">
+                <i data-lucide="external-link" class="w-3.5 h-3.5 text-red-400"></i>
+                <span>YouTube</span>
+              </a>
+            </div>
+
+            <!-- Secondary Actions -->
+            <div class="flex items-center gap-2">
+              <button onclick="redistillCurrentVideo()" title="Clean and re-distill transcript" class="px-2.5 py-1.5 rounded-md bg-obsidian-850 hover:bg-obsidian-800 text-xs text-zinc-400 hover:text-amber-400 flex items-center gap-1 transition-colors border border-obsidian-750 active:scale-95">
+                <i data-lucide="refresh-cw" class="w-3 h-3"></i>
+                <span id="redistill-btn-text">Re-distill</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- In-Transcript Realtime Filter -->
+          <div class="relative pt-1">
+            <i data-lucide="search" class="w-3.5 h-3.5 absolute left-3 top-3 text-zinc-500"></i>
+            <input type="text" id="transcript-filter" onkeyup="filterTranscriptSections()" placeholder="Search within chapters..." class="w-full bg-obsidian-950 border border-obsidian-800 rounded-md pl-9 pr-3 py-1.5 text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none transition-colors">
           </div>
         </div>
 
-        <!-- In-Transcript Realtime Filter -->
-        <div class="relative pt-1">
-          <i data-lucide="search" class="w-3.5 h-3.5 absolute left-3 top-3.5 text-zinc-500"></i>
-          <input type="text" id="transcript-filter" onkeyup="filterTranscriptSections()" placeholder="Search within chapters..." class="w-full bg-obsidian-950 border border-obsidian-800 rounded-md pl-8 pr-3 py-1.5 text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none transition-colors">
+        <!-- Executive Key Insights (Editorial Callout) -->
+        <div class="bg-obsidian-900 border-l-2 border-l-amber-500 border border-obsidian-800 rounded-r-xl p-5 sm:p-6 shadow-sm">
+          <h3 class="text-xs font-semibold uppercase tracking-wider text-amber-400/90 mb-3 flex items-center gap-1.5">
+            <i data-lucide="bookmark" class="w-3.5 h-3.5 text-amber-400"></i>
+            Key Insights
+          </h3>
+          <ul id="reader-bullets" class="space-y-2 text-xs sm:text-sm text-zinc-200">
+            <!-- Rendered via JS -->
+          </ul>
+        </div>
+
+        <!-- Key Concepts Glossary -->
+        <div id="reader-concepts-container" class="bg-obsidian-900 border border-obsidian-800 rounded-xl p-5 shadow-sm">
+          <h3 class="text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-3 flex items-center gap-1.5">
+            <i data-lucide="hash" class="w-3.5 h-3.5 text-zinc-400"></i>
+            Core Terminology
+          </h3>
+          <div id="reader-concepts" class="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
+            <!-- Rendered via JS -->
+          </div>
+        </div>
+
+        <!-- Chapter-by-Chapter Transcript -->
+        <div class="space-y-3">
+          <div class="flex items-center justify-between px-1">
+            <h2 class="text-xs font-semibold uppercase tracking-wider text-zinc-400 flex items-center gap-1.5">
+              <i data-lucide="align-left" class="w-3.5 h-3.5 text-zinc-400"></i>
+              Chapter Breakdown
+            </h2>
+            <span id="section-count-badge" class="font-mono text-[11px] text-zinc-500">0 chapters</span>
+          </div>
+
+          <div id="smart-transcript-sections" class="space-y-3">
+            <!-- Rendered via JS -->
+          </div>
+        </div>
+
+        <!-- Summary Synthesis -->
+        <div class="bg-obsidian-900 border border-obsidian-800 rounded-xl p-5 sm:p-6 text-xs text-zinc-300 leading-relaxed shadow-sm">
+          <h3 class="text-[11px] font-semibold uppercase tracking-wider text-zinc-400 mb-2">Synthesis</h3>
+          <p id="reader-synthesis" class="text-zinc-300 font-sans leading-relaxed"></p>
         </div>
       </div>
 
-      <!-- Executive Key Insights (Editorial Callout) -->
-      <div class="bg-obsidian-900 border-l-2 border-l-amber-500 border border-obsidian-800 rounded-r-xl p-5 sm:p-6 shadow-sm">
-        <h3 class="text-xs font-semibold uppercase tracking-wider text-amber-400/90 mb-3 flex items-center gap-1.5">
-          <i data-lucide="bookmark" class="w-3.5 h-3.5 text-amber-400"></i>
-          Key Insights
-        </h3>
-        <ul id="reader-bullets" class="space-y-2 text-xs sm:text-sm text-zinc-200">
-          <!-- Rendered via JS -->
-        </ul>
-      </div>
-
-      <!-- Key Concepts Glossary -->
-      <div id="reader-concepts-container" class="bg-obsidian-900 border border-obsidian-800 rounded-xl p-5 shadow-sm">
-        <h3 class="text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-3 flex items-center gap-1.5">
-          <i data-lucide="hash" class="w-3.5 h-3.5 text-zinc-400"></i>
-          Core Terminology
-        </h3>
-        <div id="reader-concepts" class="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
-          <!-- Rendered via JS -->
-        </div>
-      </div>
-
-      <!-- Chapter-by-Chapter Transcript -->
-      <div class="space-y-3">
-        <div class="flex items-center justify-between px-1">
-          <h2 class="text-xs font-semibold uppercase tracking-wider text-zinc-400 flex items-center gap-1.5">
-            <i data-lucide="align-left" class="w-3.5 h-3.5 text-zinc-400"></i>
-            Chapter Breakdown
-          </h2>
-          <span id="section-count-badge" class="font-mono text-[11px] text-zinc-500">0 sections</span>
-        </div>
-
-        <div id="smart-transcript-sections" class="space-y-3">
-          <!-- Rendered via JS -->
-        </div>
-      </div>
-
-      <!-- Summary Synthesis -->
-      <div class="bg-obsidian-900 border border-obsidian-800 rounded-xl p-5 sm:p-6 text-xs text-zinc-300 leading-relaxed">
-        <h3 class="text-[11px] font-semibold uppercase tracking-wider text-zinc-400 mb-2">Synthesis</h3>
-        <p id="reader-synthesis" class="text-zinc-300 font-sans leading-relaxed"></p>
-      </div>
-
-      <!-- Reader Empty State -->
-      <div id="reader-empty" class="hidden text-center py-20 px-6 bg-obsidian-900 rounded-xl border border-obsidian-800">
+      <!-- Reader Empty State (Visible only when no video is selected) -->
+      <div id="reader-empty" class="hidden text-center py-20 px-6 bg-obsidian-900 rounded-xl border border-obsidian-800 shadow-sm">
         <div class="w-12 h-12 mx-auto rounded-full bg-obsidian-850 flex items-center justify-center text-zinc-500 mb-3">
           <i data-lucide="book-open" class="w-5 h-5"></i>
         </div>
@@ -320,7 +324,7 @@
         <p class="text-xs text-zinc-500 max-w-sm mx-auto mb-4">
           Select a video from your Library to read its distilled notes.
         </p>
-        <button onclick="switchTab('library')" class="px-3.5 py-1.5 rounded-md bg-amber-500 hover:bg-amber-400 text-zinc-950 font-semibold text-xs transition-colors">
+        <button onclick="switchTab('library')" class="px-3.5 py-1.5 rounded-md bg-amber-500 hover:bg-amber-400 text-zinc-950 font-semibold text-xs transition-colors shadow-sm">
           Browse Library
         </button>
       </div>
@@ -408,19 +412,19 @@
 
             <!-- 4 SuperMemo Rating Buttons (visible on back) -->
             <div id="rating-buttons-group" class="hidden grid grid-cols-2 sm:grid-cols-4 gap-2">
-              <button onclick="rateCurrentCard('AGAIN')" class="p-2.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 flex flex-col items-center gap-0.5 transition-colors">
+              <button onclick="rateCurrentCard('AGAIN')" class="p-2.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 flex flex-col items-center gap-0.5 transition-colors active:scale-95">
                 <span class="text-xs font-bold">Again</span>
                 <span class="text-[10px] font-mono text-rose-400/70">&lt; 10m [1]</span>
               </button>
-              <button onclick="rateCurrentCard('HARD')" class="p-2.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 flex flex-col items-center gap-0.5 transition-colors">
+              <button onclick="rateCurrentCard('HARD')" class="p-2.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 flex flex-col items-center gap-0.5 transition-colors active:scale-95">
                 <span class="text-xs font-bold">Hard</span>
                 <span class="text-[10px] font-mono text-amber-400/70">1d [2]</span>
               </button>
-              <button onclick="rateCurrentCard('GOOD')" class="p-2.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex flex-col items-center gap-0.5 transition-colors">
+              <button onclick="rateCurrentCard('GOOD')" class="p-2.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex flex-col items-center gap-0.5 transition-colors active:scale-95">
                 <span class="text-xs font-bold">Good</span>
                 <span class="text-[10px] font-mono text-emerald-400/70">3d [3]</span>
               </button>
-              <button onclick="rateCurrentCard('EASY')" class="p-2.5 rounded-xl bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 border border-sky-500/30 flex flex-col items-center gap-0.5 transition-colors">
+              <button onclick="rateCurrentCard('EASY')" class="p-2.5 rounded-xl bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 border border-sky-500/30 flex flex-col items-center gap-0.5 transition-colors active:scale-95">
                 <span class="text-xs font-bold">Easy</span>
                 <span class="text-[10px] font-mono text-sky-400/70">7d [4]</span>
               </button>
@@ -442,10 +446,10 @@
           </p>
         </div>
         <div class="pt-2 flex items-center justify-center gap-3">
-          <button onclick="loadAllCardsSession()" class="px-3.5 py-1.5 rounded-lg bg-obsidian-800 hover:bg-obsidian-750 text-xs font-medium text-zinc-300 border border-obsidian-700 transition-colors">
+          <button onclick="loadAllCardsSession()" class="px-3.5 py-1.5 rounded-lg bg-obsidian-800 hover:bg-obsidian-750 text-xs font-medium text-zinc-300 border border-obsidian-700 transition-colors active:scale-95">
             Review All Cards Anyway
           </button>
-          <button onclick="switchTab('library')" class="px-3.5 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-xs font-bold text-zinc-950 transition-colors">
+          <button onclick="switchTab('library')" class="px-3.5 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-xs font-bold text-zinc-950 transition-colors shadow-sm active:scale-95">
             Back to Library
           </button>
         </div>
@@ -483,7 +487,7 @@
               <div id="settings-account-email" class="text-xs text-amber-400/90 font-mono">vasanthabalanb4@gmail.com</div>
               <div id="settings-sync-status" class="text-[11px] text-zinc-500">Continuous background capture active via Chrome Extension</div>
             </div>
-            <button onclick="syncYouTubeHistoryFromUI()" class="px-2.5 py-1.5 rounded-md bg-obsidian-850 hover:bg-obsidian-800 text-zinc-300 border border-obsidian-750 hover:border-zinc-600 text-xs font-medium flex items-center gap-1 transition-colors whitespace-nowrap">
+            <button onclick="syncYouTubeHistoryFromUI()" class="px-2.5 py-1.5 rounded-md bg-obsidian-850 hover:bg-obsidian-800 text-zinc-300 border border-obsidian-750 hover:border-zinc-600 text-xs font-medium flex items-center gap-1 transition-colors whitespace-nowrap active:scale-95">
               <i data-lucide="refresh-cw" class="w-3 h-3 text-zinc-400"></i>
               <span>Sync</span>
             </button>
@@ -518,7 +522,7 @@
                   Install the official Android app. Integrates directly into Android's <strong>YouTube Share Sheet</strong>: tap "Share" on any video to auto-transcribe!
                 </p>
               </div>
-              <a href="/api/download/android-apk" download="youtube-recall.apk" class="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md bg-amber-500 hover:bg-amber-400 text-zinc-950 font-semibold text-xs transition-colors shadow-sm w-full">
+              <a href="/api/download/android-apk" download="youtube-recall.apk" class="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md bg-amber-500 hover:bg-amber-400 text-zinc-950 font-semibold text-xs transition-colors shadow-sm w-full active:scale-95">
                 <i data-lucide="download" class="w-3.5 h-3.5 stroke-[2.5]"></i>
                 <span>Download APK (v1.0.0)</span>
               </a>
@@ -562,7 +566,12 @@
                 <span>⚡ Test Key</span>
               </button>
             </div>
-            <input type="password" id="setting-gemini-key" placeholder="AIzaSy... (Leave empty to use Local Engine)" class="w-full bg-obsidian-950 border border-obsidian-800 rounded-md px-3 py-2 text-xs text-zinc-200 focus:outline-none">
+            <div class="relative">
+              <input type="password" id="setting-gemini-key" placeholder="AIzaSy... (Leave empty to use Local Engine)" class="w-full bg-obsidian-950 border border-obsidian-800 rounded-md pl-3 pr-10 py-2 text-xs text-zinc-200 focus:outline-none">
+              <button type="button" onclick="togglePasswordVisibility('setting-gemini-key', this)" class="absolute right-2.5 top-2 text-zinc-500 hover:text-zinc-300 transition-colors p-0.5">
+                <i data-lucide="eye" class="w-4 h-4"></i>
+              </button>
+            </div>
             <div id="gemini-test-result" class="text-[11px] mt-1.5 hidden"></div>
           </div>
         </div>
@@ -574,7 +583,7 @@
             Use YouTube Recall on your Android phone anywhere in the world. Run <code class="text-amber-400 bg-obsidian-950 px-1.5 py-0.5 rounded border border-obsidian-800">start-online.bat</code> on your PC to generate a free secure HTTPS tunnel, then paste the URL into your Android app.
           </p>
           <div class="flex items-center gap-2 pt-1">
-            <button onclick="copyCurrentOrigin()" type="button" class="px-3 py-1.5 rounded-md bg-obsidian-950 hover:bg-obsidian-800 border border-obsidian-800 text-xs text-zinc-300 font-medium transition-colors">
+            <button onclick="copyCurrentOrigin()" type="button" class="px-3 py-1.5 rounded-md bg-obsidian-950 hover:bg-obsidian-800 border border-obsidian-800 text-xs text-zinc-300 font-medium transition-colors active:scale-95">
               📋 Copy Current Server URL
             </button>
             <span id="copy-url-toast" class="text-[11px] text-emerald-400 hidden">✓ Copied to clipboard!</span>
@@ -594,8 +603,8 @@
           </div>
         </div>
 
-        <div class="flex justify-end">
-          <button onclick="saveSettings()" class="px-4 py-1.5 rounded-md bg-amber-500 hover:bg-amber-400 text-zinc-950 font-semibold text-xs transition-colors">
+        <div class="flex justify-end pt-2">
+          <button onclick="saveSettings()" class="px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-zinc-950 font-semibold text-xs transition-colors shadow-sm active:scale-95">
             Save Settings
           </button>
         </div>
@@ -604,39 +613,39 @@
   </main>
 
   <!-- Add Video Modal -->
-  <div id="capture-modal" class="hidden fixed inset-0 z-50 overflow-y-auto bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
-    <div class="bg-obsidian-900 border border-obsidian-800 rounded-xl w-full max-w-md p-6 shadow-2xl">
+  <div id="capture-modal" onclick="handleModalBackdropClick(event)" class="hidden fixed inset-0 z-50 overflow-y-auto bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 modal-overlay">
+    <div class="bg-obsidian-900 border border-obsidian-800 rounded-2xl w-full max-w-md p-6 shadow-2xl modal-content" onclick="event.stopPropagation()">
       <div class="flex items-center justify-between pb-3 border-b border-obsidian-800 mb-4">
         <h3 class="text-xs font-semibold uppercase tracking-wider text-zinc-200 flex items-center gap-2">
-          <i data-lucide="plus" class="w-3.5 h-3.5 text-amber-400"></i>
+          <i data-lucide="plus" class="w-4 h-4 text-amber-400"></i>
           Add YouTube Video
         </h3>
-        <button onclick="closeCaptureModal()" class="text-zinc-500 hover:text-zinc-200">
+        <button onclick="closeCaptureModal()" class="p-1 rounded-md text-zinc-500 hover:text-zinc-200 hover:bg-obsidian-800 transition-colors">
           <i data-lucide="x" class="w-4 h-4"></i>
         </button>
       </div>
 
       <div class="space-y-4">
         <div>
-          <label class="block text-xs text-zinc-400 mb-1.5">Video Link or ID</label>
-          <input type="text" id="intake-url" placeholder="https://www.youtube.com/watch?v=..." class="w-full bg-obsidian-950 border border-obsidian-800 rounded-md px-3 py-2 text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none">
+          <label class="block text-xs text-zinc-400 mb-1.5 font-medium">Video Link or 11-char ID</label>
+          <input type="text" id="intake-url" onkeydown="if(event.key==='Enter') submitVideoIntake()" placeholder="https://www.youtube.com/watch?v=... or shorts URL" class="w-full bg-obsidian-950 border border-obsidian-800 rounded-lg px-3.5 py-2.5 text-xs sm:text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none">
         </div>
 
         <input type="hidden" id="intake-force" value="true">
 
         <!-- Status feedback -->
-        <div id="intake-status" class="hidden p-3 rounded-md bg-obsidian-950 border border-obsidian-800 text-xs">
-          <div class="flex items-center gap-2 text-amber-400 font-medium">
-            <div class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-ping"></div>
+        <div id="intake-status" class="hidden p-3 rounded-lg bg-obsidian-950 border border-obsidian-800 text-xs">
+          <div class="flex items-center gap-2.5 text-amber-400 font-medium">
+            <div class="w-2 h-2 rounded-full bg-amber-500 animate-ping"></div>
             <span id="intake-status-text">Processing transcript...</span>
           </div>
         </div>
 
-        <div class="pt-1 flex justify-end gap-2">
-          <button onclick="closeCaptureModal()" class="px-3 py-1.5 rounded-md bg-obsidian-850 hover:bg-obsidian-800 text-xs font-medium text-zinc-400 hover:text-zinc-200 transition-colors border border-obsidian-750">
+        <div class="pt-2 flex justify-end gap-2.5">
+          <button onclick="closeCaptureModal()" class="px-3.5 py-2 rounded-lg bg-obsidian-850 hover:bg-obsidian-800 text-xs font-medium text-zinc-400 hover:text-zinc-200 transition-colors border border-obsidian-750">
             Cancel
           </button>
-          <button id="intake-submit-btn" onclick="submitVideoIntake()" class="px-3.5 py-1.5 rounded-md bg-amber-500 hover:bg-amber-400 text-zinc-950 font-semibold text-xs transition-colors">
+          <button id="intake-submit-btn" onclick="submitVideoIntake()" class="px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-zinc-950 font-semibold text-xs transition-colors shadow-sm active:scale-95">
             <span>Transcribe Video</span>
           </button>
         </div>
@@ -662,7 +671,7 @@
       </button>
 
       <!-- Tab 3: Quick Add / Capture -->
-      <button id="mob-nav-add-btn" onclick="openCaptureModal()" class="flex flex-col items-center justify-center py-0.5 text-amber-400 active:scale-95 transition-transform">
+      <button id="mob-nav-add-btn" onclick="openCaptureModal()" class="flex flex-col items-center justify-center py-0.5 text-amber-400 active:scale-90 transition-transform">
         <div class="w-10 h-10 rounded-full bg-amber-500 hover:bg-amber-400 text-zinc-950 flex items-center justify-center shadow-lg shadow-amber-500/25 mb-0.5">
           <i data-lucide="plus" class="w-5 h-5 stroke-[2.5]"></i>
         </div>
@@ -684,6 +693,9 @@
 
     </div>
   </nav>
+
+  <!-- Non-Blocking Toast Notification Container -->
+  <div id="toast-container"></div>
 
   <footer class="border-t border-obsidian-850 bg-obsidian-950 py-5 text-center text-xs text-zinc-600 pb-16 sm:pb-5">
     <p>YouTube Recall • Human-Crafted AI Knowledge Engine</p>

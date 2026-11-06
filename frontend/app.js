@@ -5,6 +5,56 @@ let currentViewingVideo = null;
 let activeCategory = "";
 let currentSort = "recently_watched";
 
+// Elegant Non-Blocking Toast Notification Helper
+function showToastNotification(message, type = "info", durationMs = 3500) {
+  const container = document.getElementById("toast-container");
+  if (!container) return;
+
+  const toast = document.createElement("div");
+  toast.className = `app-toast toast-${type}`;
+  
+  let iconName = "info";
+  if (type === "success") iconName = "check-circle";
+  if (type === "error") iconName = "alert-circle";
+
+  toast.innerHTML = `
+    <div class="flex items-center gap-2.5 min-w-0">
+      <i data-lucide="${iconName}" class="toast-icon w-4 h-4 flex-shrink-0"></i>
+      <span class="text-xs font-medium leading-snug truncate">${message}</span>
+    </div>
+    <button onclick="this.parentElement.remove()" class="text-zinc-500 hover:text-zinc-200 transition-colors p-0.5 ml-2">
+      <i data-lucide="x" class="w-3.5 h-3.5"></i>
+    </button>
+  `;
+
+  container.appendChild(toast);
+  if (window.lucide) lucide.createIcons();
+
+  setTimeout(() => {
+    toast.classList.add("toast-fadeout");
+    setTimeout(() => {
+      if (toast && toast.parentNode) toast.parentNode.removeChild(toast);
+    }, 250);
+  }, durationMs);
+}
+
+// Password / Key visibility toggle
+function togglePasswordVisibility(inputId, btn) {
+  const input = document.getElementById(inputId);
+  if (!input) return;
+  const isPass = input.type === "password";
+  input.type = isPass ? "text" : "password";
+  btn.innerHTML = `<i data-lucide="${isPass ? 'eye-off' : 'eye'}" class="w-4 h-4 text-amber-400"></i>`;
+  if (window.lucide) lucide.createIcons();
+}
+
+// Modal Backdrop Dismiss
+function handleModalBackdropClick(event) {
+  if (event.target.id === "capture-modal") {
+    closeCaptureModal();
+  }
+}
+
 function formatRelativeTime(dateString) {
   if (!dateString) return "Recently";
   try {
@@ -252,7 +302,7 @@ function renderVideosGrid() {
         <div>
           <!-- Thumbnail & duration pill -->
           <div class="relative aspect-video bg-obsidian-950 overflow-hidden cursor-pointer" onclick="openReaderForVideo('${v.video_id}')">
-            <img src="${v.thumbnail_url || 'https://img.youtube.com/vi/' + v.video_id + '/mqdefault.jpg'}" alt="${v.title}" class="w-full h-full object-cover group-hover:scale-102 transition-transform duration-300">
+            <img src="${v.thumbnail_url || 'https://img.youtube.com/vi/' + v.video_id + '/mqdefault.jpg'}" onerror="this.onerror=null; this.src='/static/icon.svg'; this.classList.add('p-8');" alt="${v.title}" class="w-full h-full object-cover group-hover:scale-102 transition-transform duration-300">
             <span class="absolute bottom-2 right-2 px-1.5 py-0.5 rounded text-[10px] font-mono bg-black/80 text-zinc-300 font-medium">
               ${durationMin}m
             </span>
@@ -328,11 +378,16 @@ function openReaderForVideo(videoId) {
 
 // Render Smart Reader View
 function renderReaderView(video) {
+  const content = document.getElementById("reader-content");
+  const empty = document.getElementById("reader-empty");
+
   if (!video) {
-    document.getElementById("reader-empty").classList.remove("hidden");
+    if (content) content.classList.add("hidden");
+    if (empty) empty.classList.remove("hidden");
     return;
   }
-  document.getElementById("reader-empty").classList.add("hidden");
+  if (content) content.classList.remove("hidden");
+  if (empty) empty.classList.add("hidden");
 
   // Title & Metadata
   document.getElementById("reader-title").textContent = video.title;
@@ -471,6 +526,7 @@ function copyCrispPoints() {
       btnText.textContent = "✓ Copied!";
       setTimeout(() => btnText.textContent = "Copy Notes", 2000);
     }
+    showToastNotification("Notes copied to clipboard", "success");
   });
 }
 
@@ -491,9 +547,10 @@ function copyFullTranscript() {
   navigator.clipboard.writeText(out).then(() => {
     const btnText = document.getElementById("copy-transcript-text");
     if (btnText) {
-      btnText.textContent = "✓ Copied to Clipboard!";
+      btnText.textContent = "✓ Copied!";
       setTimeout(() => btnText.textContent = "Copy Full Transcript", 2000);
     }
+    showToastNotification("Full transcript copied to clipboard", "success");
   });
 }
 
@@ -519,8 +576,9 @@ async function redistillCurrentVideo() {
       btnText.textContent = "✓ Refined!";
       setTimeout(() => btnText.textContent = original, 2500);
     }
+    showToastNotification("Transcript re-distilled and refined!", "success");
   } catch (e) {
-    alert("Re-distillation notice: " + e.message);
+    showToastNotification("Re-distillation notice: " + e.message, "error");
     if (btnText) btnText.textContent = original;
   }
 }
@@ -529,18 +587,21 @@ function downloadMarkdownById(videoId) {
   window.location.href = `/api/export/obsidian/${videoId}/download`;
 }
 
-async function deleteVideoById(videoId) {
-  if (!confirm("Are you sure you want to delete this transcript?")) return;
+async function deleteVideoById(videoId, videoTitle = "this video") {
+  if (!confirm(`Remove "${videoTitle}" from your library?`)) return;
   try {
     const res = await fetch(`/api/videos/${videoId}`, { method: "DELETE" });
     if (res.ok) {
       if (currentViewingVideo && currentViewingVideo.id === videoId) {
         currentViewingVideo = null;
       }
+      showToastNotification("Video removed from library", "info");
       loadVideos();
+    } else {
+      showToastNotification("Failed to delete video", "error");
     }
   } catch (e) {
-    alert("Delete failed: " + e.message);
+    showToastNotification("Delete error: " + e.message, "error");
   }
 }
 
@@ -566,7 +627,8 @@ async function submitVideoIntake() {
   const force = forceEl ? (forceEl.type === "checkbox" ? forceEl.checked : forceEl.value === "true") : true;
 
   if (!url) {
-    alert("Please enter a YouTube video URL or ID.");
+    showToastNotification("Please enter a YouTube video URL or ID", "error");
+    if (urlEl) urlEl.focus();
     return;
   }
 
@@ -599,6 +661,7 @@ async function submitVideoIntake() {
     }
 
     if (statusText) statusText.textContent = "Smart transcript distilled successfully!";
+    showToastNotification("Video distilled into smart transcript!", "success");
     setTimeout(() => {
       closeCaptureModal();
       if (submitBtn) {
@@ -612,7 +675,7 @@ async function submitVideoIntake() {
     }, 600);
 
   } catch (e) {
-    alert("Transcription Error: " + e.message);
+    showToastNotification("Transcription Notice: " + e.message, "error");
     if (submitBtn) {
       submitBtn.disabled = false;
       submitBtn.classList.remove("opacity-50");
@@ -668,12 +731,12 @@ async function saveSettings() {
       body: JSON.stringify(payload)
     });
     if (res.ok) {
-      alert("Settings saved successfully!");
+      showToastNotification("Settings saved successfully!", "success");
     } else {
-      alert("Failed to save settings.");
+      showToastNotification("Failed to save settings.", "error");
     }
   } catch (e) {
-    alert("Error saving settings: " + e.message);
+    showToastNotification("Error saving settings: " + e.message, "error");
   }
 }
 
