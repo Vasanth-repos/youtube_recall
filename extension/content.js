@@ -438,9 +438,21 @@
     setTimeout(injectSaveButton, 600);
     setTimeout(detectAndReportAccount, 1000);
     setTimeout(checkHistoryPageBanner, 1200);
+    triggerCloudSyncIfDue();
   });
   
+  // Cloud Watch History sync trigger (debounced to once every 2 minutes)
+  let lastCloudSyncTrigger = 0;
+  function triggerCloudSyncIfDue() {
+    const now = Date.now();
+    if (now - lastCloudSyncTrigger > 120000) {
+      lastCloudSyncTrigger = now;
+      safeSendMessage({ action: "manual_history_sync", maxCount: 25 });
+    }
+  }
+
   // Initial check on script load
+  triggerCloudSyncIfDue();
   const initialVid = getVideoId();
   if (initialVid) {
     safeSendMessage({

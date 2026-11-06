@@ -204,109 +204,211 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   }
 });
 
-// Synchronize YouTube watch history from Chrome's browsing history in batch
-async function syncYouTubeHistory(maxResults = 25) {
-  return new Promise((resolve) => {
-    try {
-      const oneWeekAgo = Date.now() - (7 * 24 * 60 * 60 * 1000);
-      chrome.history.search(
-        {
-          text: "https://www.youtube.com/watch",
-          startTime: oneWeekAgo,
-          maxResults: maxResults
-        },
-        async (historyItems) => {
-          if (chrome.runtime.lastError) {
-            console.log("[YouTube Recall] History search notice:", chrome.runtime.lastError.message);
-            return resolve({
-              success: false,
-              message: chrome.runtime.lastError.message
-            });
-          }
+// Fetches the user's Google/YouTube cloud watch history feed
+// Automatically captures all videos watched on Android Mobile, Tablet, Smart TV, or PC under this Google account
+async function fetchCloudWatchHistory(limit = 30) {
+  try {
+    console.log("[YouTube Recall] Querying Google Account Watch History from https://www.youtube.com/feed/history...");
+    const resp = await fetch("https://www.youtube.com/feed/history", {
+      method: "GET",
+      credentials: "include",
+      headers: {
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+      }
+    });
 
-          if (!historyItems || historyItems.length === 0) {
-            return resolve({
-              success: true,
-              total_received: 0,
-              newly_synced: 0,
-              already_synced: 0,
-              message: "No recent YouTube watch history found in browser."
-            });
-          }
+    if (!resp.ok) {
+      console.log(`[YouTube Recall] Feed history returned status ${resp.status}`);
+      return [];
+    }
 
-          const seenIds = new Set();
-          const itemsToSync = [];
+    const html = await resp.text();
 
-          for (const item of historyItems) {
-            if (!item || !item.url) continue;
-            const videoId = extractVideoId(item.url);
-            if (videoId && !seenIds.has(videoId)) {
-              seenIds.add(videoId);
-              itemsToSync.push({
-                video_url_or_id: videoId,
-                title: (item.title || "").replace(" - YouTube", "").trim(),
-                watched_at: item.lastVisitTime ? new Date(item.lastVisitTime).toISOString() : new Date().toISOString(),
-                watch_time_seconds: 180
+    // Check if user is logged into YouTube in this browser profile
+    if (html.includes('href="https://accounts.google.com/ServiceLogin') && !html.includes("var ytInitialData")) {
+      console.log("[YouTube Recall] Note: YouTube session not authenticated in this Chrome profile.");
+      return [];
+    }
+
+    const videos = [];
+    const seenIds = new Set();
+
+    // Strategy 1: Parse ytInitialData JSON object embedded in page
+    const initialDataMatch = html.match(/var ytInitialData\s*=\s*({.+?});<\/script>/s) ||
+                             html.match(/window\["ytInitialData"\]\s*=\s*({.+?});<\/script>/s);
+
+    if (initialDataMatch && initialDataMatch[1]) {
+      try {
+        const data = JSON.parse(initialDataMatch[1]);
+        
+        function extractFromData(node) {
+          if (!node || typeof node !== "object") return;
+          if (node.videoRenderer && node.videoRenderer.videoId) {
+            const vr = node.videoRenderer;
+            const vId = vr.videoId;
+            if (vId && !seenIds.has(vId) && seenIds.size < limit) {
+              seenIds.add(vId);
+              let title = "";
+              if (vr.title && vr.title.runs && vr.title.runs[0]) {
+                title = vr.title.runs[0].text || "";
+              } else if (vr.title && vr.title.simpleText) {
+                title = vr.title.simpleText;
+              }
+              videos.push({
+                video_url_or_id: vId,
+                title: title.replace(" - YouTube", "").trim(),
+                watch_time_seconds: 180,
+                watched_at: new Date().toISOString()
               });
             }
           }
-
-          if (itemsToSync.length === 0) {
-            return resolve({
-              success: true,
-              total_received: 0,
-              newly_synced: 0,
-              already_synced: 0,
-              message: "No valid YouTube videos to synchronize."
-            });
+          for (const k of Object.keys(node)) {
+            extractFromData(node[k]);
           }
+        }
 
-          chrome.storage.local.get(["yt_account_info"], async (res) => {
-            if (chrome.runtime.lastError) {} // Consume
-            const account = (res && res.yt_account_info) || {};
+        extractFromData(data);
+        if (videos.length > 0) {
+          console.log(`[YouTube Recall] ✓ Extracted ${videos.length} videos from Google Account Watch History (including mobile watches)!`);
+          return videos;
+        }
+      } catch (jsonErr) {
+        console.log("[YouTube Recall] JSON parse notice on ytInitialData:", jsonErr.message);
+      }
+    }
 
-            try {
-              const resp = await postToBackend("/api/videos/sync-history", {
-                items: itemsToSync,
-                account_name: account.account_name || "Vasanthabalan",
-                account_email: account.account_email || "vasanthabalanb4@gmail.com",
-                avatar_url: account.avatar_url || ""
-              });
+    // Strategy 2: Resilient Regex scan across raw HTML for watch links
+    const regex = /\/watch\?v=([a-zA-Z0-9_-]{11})/g;
+    let match;
+    while ((match = regex.exec(html)) !== null && seenIds.size < limit) {
+      const vId = match[1];
+      if (vId && !seenIds.has(vId)) {
+        seenIds.add(vId);
+        videos.push({
+          video_url_or_id: vId,
+          title: "",
+          watch_time_seconds: 180,
+          watched_at: new Date().toISOString()
+        });
+      }
+    }
 
-              if (!resp.ok) {
-                const errData = await resp.json().catch(() => ({}));
-                return resolve({
-                  success: false,
-                  message: errData.detail || "Server rejected history sync"
+    console.log(`[YouTube Recall] Extracted ${videos.length} videos from cloud history via HTML scan.`);
+    return videos;
+  } catch (err) {
+    console.log("[YouTube Recall] Cloud history fetch notice:", err.message);
+    return [];
+  }
+}
+
+// Synchronize YouTube watch history (Cloud Google Account History + Local Chrome History)
+async function syncYouTubeHistory(maxResults = 30) {
+  try {
+    // 1. Fetch Cloud Watch History (Google Account - captures mobile, tablet, and PC watches)
+    const cloudVideos = await fetchCloudWatchHistory(maxResults);
+
+    // 2. Also search local Chrome browsing history
+    const localVideos = await new Promise((resolve) => {
+      try {
+        const oneWeekAgo = Date.now() - (7 * 24 * 60 * 60 * 1000);
+        chrome.history.search(
+          {
+            text: "https://www.youtube.com/watch",
+            startTime: oneWeekAgo,
+            maxResults: maxResults
+          },
+          (historyItems) => {
+            if (chrome.runtime.lastError || !historyItems) return resolve([]);
+            const res = [];
+            for (const item of historyItems) {
+              if (!item || !item.url) continue;
+              const vId = extractVideoId(item.url);
+              if (vId) {
+                res.push({
+                  video_url_or_id: vId,
+                  title: (item.title || "").replace(" - YouTube", "").trim(),
+                  watched_at: item.lastVisitTime ? new Date(item.lastVisitTime).toISOString() : new Date().toISOString(),
+                  watch_time_seconds: 180
                 });
               }
-
-              const data = await resp.json();
-              chrome.storage.local.set({
-                last_history_sync_time: Date.now(),
-                last_sync_stats: data
-              }, () => {
-                if (chrome.runtime.lastError) {}
-              });
-
-              resolve({
-                success: true,
-                ...data
-              });
-            } catch (fetchErr) {
-              console.log("[YouTube Recall] Backend server notice:", fetchErr ? fetchErr.message : fetchErr);
-              resolve({
-                success: false,
-                message: "Backend server temporarily unreachable at localhost:8000"
-              });
             }
-          });
-        }
-      );
-    } catch (err) {
-      resolve({ success: false, message: err ? err.message : "History sync error" });
+            resolve(res);
+          }
+        );
+      } catch (e) {
+        resolve([]);
+      }
+    });
+
+    // 3. Merge Cloud + Local videos (prioritizing cloud feed for recency)
+    const combined = [];
+    const seenIds = new Set();
+
+    for (const v of [...cloudVideos, ...localVideos]) {
+      if (v.video_url_or_id && !seenIds.has(v.video_url_or_id)) {
+        seenIds.add(v.video_url_or_id);
+        combined.push(v);
+        if (combined.length >= maxResults) break;
+      }
     }
-  });
+
+    if (combined.length === 0) {
+      return {
+        success: true,
+        total_received: 0,
+        newly_synced: 0,
+        already_synced: 0,
+        message: "No recent YouTube watch history found in account or browser."
+      };
+    }
+
+    // 4. Retrieve account info and post to backend
+    const accountInfo = await new Promise((resolve) => {
+      chrome.storage.local.get(["yt_account_info"], (res) => {
+        if (chrome.runtime.lastError) {}
+        resolve((res && res.yt_account_info) || {});
+      });
+    });
+
+    const resp = await postToBackend("/api/videos/sync-history", {
+      items: combined,
+      account_name: accountInfo.account_name || "Vasanthabalan",
+      account_email: accountInfo.account_email || "vasanthabalanb4@gmail.com",
+      avatar_url: accountInfo.avatar_url || ""
+    });
+
+    if (!resp.ok) {
+      const errData = await resp.json().catch(() => ({}));
+      return {
+        success: false,
+        message: errData.detail || "Server rejected history sync"
+      };
+    }
+
+    const data = await resp.json();
+    if (data.newly_synced > 0) {
+      safeSetBadge(`+${data.newly_synced}`, "#f59e0b", 8000);
+      console.log(`[YouTube Recall] 🎉 Successfully auto-synced ${data.newly_synced} new videos from Google account!`);
+    }
+
+    chrome.storage.local.set({
+      last_history_sync_time: Date.now(),
+      last_sync_stats: data
+    }, () => {
+      if (chrome.runtime.lastError) {}
+    });
+
+    return {
+      success: true,
+      ...data
+    };
+  } catch (err) {
+    console.log("[YouTube Recall] Backend server notice during history sync:", err ? err.message : err);
+    return {
+      success: false,
+      message: "Backend server temporarily unreachable at localhost:8000"
+    };
+  }
 }
 
 // Listen for messages from Content Scripts and Popup

@@ -211,6 +211,10 @@ def sync_youtube_history(payload: YouTubeHistorySyncRequest, db: Session = Depen
             already_synced += 1
             continue
 
+        if newly_synced >= 5:
+            # Throttle to max 5 new video AI distillations per sync cycle for fast responsiveness
+            break
+
         try:
             req = VideoIntakeRequest(
                 video_url_or_id=raw_id,
