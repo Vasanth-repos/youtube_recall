@@ -195,8 +195,8 @@ function renderReaderView(video) {
 
   // Title & Metadata
   document.getElementById("reader-title").textContent = video.title;
-  document.getElementById("reader-category").textContent = video.category;
-  document.getElementById("reader-channel").textContent = `Channel: ${video.channel_title}`;
+  document.getElementById("reader-category").textContent = video.category || "General";
+  document.getElementById("reader-channel").textContent = video.channel_title || "Unknown Channel";
   document.getElementById("reader-duration").textContent = `${Math.floor(video.duration_seconds / 60)}m ${video.duration_seconds % 60}s`;
   document.getElementById("reader-yt-link").href = `https://www.youtube.com/watch?v=${video.video_id}`;
 
