@@ -141,8 +141,9 @@ document.addEventListener("DOMContentLoaded", async () => {
       } catch (e) {}
     }
 
-    // Query status from content script
+    // Query status from content script safely
     chrome.tabs.sendMessage(activeTab.id, { action: "get_status" }, (status) => {
+      const lastErr = chrome.runtime.lastError; // Explicitly consume lastError to prevent Chrome from logging it
       const isProcessed = isAlreadyInDb || (status && status.isProcessed);
       const isTranscribing = status && status.isTranscribing;
 
@@ -186,6 +187,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                     watched_at: new Date().toISOString()
                   }
                 }, (apiRes) => {
+                  const portErr = chrome.runtime.lastError;
                   if (apiRes && apiRes.success) {
                     mainBtn.disabled = false;
                     mainBtn.innerHTML = "<span>📖 Open in Smart Reader</span>";

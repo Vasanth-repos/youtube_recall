@@ -198,7 +198,10 @@ async function syncYouTubeHistory(maxResults = 25) {
 
             if (!resp.ok) {
               const errData = await resp.json().catch(() => ({}));
-              return reject(new Error(errData.detail || "Server rejected history sync"));
+              return resolve({
+                success: false,
+                message: errData.detail || "Server rejected history sync"
+              });
             }
 
             const data = await resp.json();
@@ -225,6 +228,13 @@ async function syncYouTubeHistory(maxResults = 25) {
   });
 }
 
+// Helper to safely respond to messages without throwing if sender disconnected
+function safeReply(sendResponse, payload) {
+  try {
+    sendResponse(payload);
+  } catch (e) {}
+}
+
 // Listen for messages from Content Scripts and Popup
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "intake_video") {
@@ -232,20 +242,22 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       .then(async (resp) => {
         if (!resp.ok) {
           const errData = await resp.json().catch(() => ({}));
-          return sendResponse({ success: false, error: errData.detail || "Server error" });
+          return safeReply(sendResponse, { success: false, error: errData.detail || "Server error" });
         }
         const data = await resp.json();
         if (chrome.action && chrome.action.setBadgeText) {
           chrome.action.setBadgeText({ text: "✓" });
           chrome.action.setBadgeBackgroundColor({ color: "#22c55e" });
           setTimeout(() => {
-            chrome.action.setBadgeText({ text: "" });
+            try {
+              chrome.action.setBadgeText({ text: "" });
+            } catch (e) {}
           }, 6000);
         }
-        sendResponse({ success: true, data: data });
+        safeReply(sendResponse, { success: true, data: data });
       })
       .catch((err) => {
-        sendResponse({ success: false, error: err.message });
+        safeReply(sendResponse, { success: false, error: err.message });
       });
     return true; // Keep channel open for async response
   }
@@ -254,25 +266,25 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     getFromBackend("/api/health")
       .then(async (resp) => {
         const data = await resp.json();
-        sendResponse({ online: true, data: data });
+        safeReply(sendResponse, { online: true, data: data });
       })
       .catch((err) => {
-        sendResponse({ online: false, error: err.message });
+        safeReply(sendResponse, { online: false, error: err.message });
       });
     return true;
   }
 
   if (request.action === "auto_sync_video") {
     autoSyncVideo(request.videoId, request.title, request.watched_at)
-      .then(() => sendResponse({ success: true }))
-      .catch((err) => sendResponse({ success: false, error: err.message }));
+      .then(() => safeReply(sendResponse, { success: true }))
+      .catch((err) => safeReply(sendResponse, { success: false, error: err.message }));
     return true;
   }
 
   if (request.action === "manual_history_sync") {
     syncYouTubeHistory(request.maxCount || 30)
-      .then((result) => sendResponse(result))
-      .catch((err) => sendResponse({ success: false, error: err.message }));
+      .then((result) => safeReply(sendResponse, result))
+      .catch((err) => safeReply(sendResponse, { success: false, error: err.message }));
     return true;
   }
 
@@ -285,7 +297,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         channel_id: request.account_info.channel_id || "",
         linked_method: "browser_extension"
       }).catch(() => {});
-      sendResponse({ success: true });
+      safeReply(sendResponse, { success: true });
     });
     return true;
   }

@@ -164,29 +164,29 @@ function renderVideosGrid() {
     const watchedTime = formatRelativeTime(v.last_watched_at || v.created_at);
 
     return `
-      <div class="bg-dark-900 border border-dark-700/70 rounded-xl overflow-hidden shadow-sm hover:border-slate-700 transition-all flex flex-col justify-between group">
+      <div class="bg-obsidian-900/90 border border-obsidian-750/80 rounded-xl overflow-hidden hover:border-obsidian-600 transition-all flex flex-col justify-between group shadow-sm">
         <div>
           <!-- Thumbnail & duration pill -->
-          <div class="relative aspect-video bg-dark-950 overflow-hidden cursor-pointer" onclick="openReaderForVideo('${v.video_id}')">
+          <div class="relative aspect-video bg-obsidian-950 overflow-hidden cursor-pointer" onclick="openReaderForVideo('${v.video_id}')">
             <img src="${v.thumbnail_url || 'https://img.youtube.com/vi/' + v.video_id + '/mqdefault.jpg'}" alt="${v.title}" class="w-full h-full object-cover group-hover:scale-102 transition-transform duration-300">
-            <span class="absolute bottom-2 right-2 px-1.5 py-0.5 rounded text-[10px] font-mono bg-black/85 text-white font-semibold">
+            <span class="absolute bottom-2 right-2 px-1.5 py-0.5 rounded text-[10px] font-mono bg-black/80 text-zinc-300 font-medium">
               ${durationMin}m
             </span>
-            <span class="absolute top-2 left-2 px-2 py-0.5 rounded text-[9px] font-semibold tracking-wider uppercase bg-black/75 text-brand-400 border border-brand-500/30 backdrop-blur">
+            <span class="absolute top-2 left-2 px-2 py-0.5 rounded text-[9px] font-mono tracking-wider uppercase bg-obsidian-950/85 text-amber-400/90 border border-amber-500/20 backdrop-blur">
               ${v.category}
             </span>
           </div>
 
           <!-- Video Details -->
           <div class="p-4">
-            <h3 onclick="openReaderForVideo('${v.video_id}')" class="font-semibold text-white text-sm line-clamp-2 hover:text-brand-400 cursor-pointer transition-colors mb-1.5 leading-snug">
+            <h3 onclick="openReaderForVideo('${v.video_id}')" class="font-serif font-medium text-zinc-100 text-sm sm:text-base line-clamp-2 hover:text-amber-400 cursor-pointer transition-colors mb-1.5 leading-snug">
               ${v.title}
             </h3>
-            <div class="flex items-center gap-1.5 text-xs text-slate-400 mb-2">
-              <span class="text-slate-300 font-medium truncate max-w-[140px]">${v.channel_title}</span>
-              <span class="text-slate-600">•</span>
-              <span class="text-emerald-400/90 font-mono text-[10px] flex items-center gap-1" title="Watched: ${v.last_watched_at || v.created_at}">
-                <i data-lucide="clock" class="w-3 h-3 text-emerald-400"></i>
+            <div class="flex items-center gap-2 text-xs text-zinc-400 mb-2">
+              <span class="text-zinc-300 font-medium truncate max-w-[140px]">${v.channel_title}</span>
+              <span class="text-zinc-600">•</span>
+              <span class="text-zinc-400 font-mono text-[11px] flex items-center gap-1.5" title="Watched: ${v.last_watched_at || v.created_at}">
+                <i data-lucide="clock" class="w-3 h-3 text-amber-500/80"></i>
                 ${watchedTime}
               </span>
             </div>
@@ -194,14 +194,14 @@ function renderVideosGrid() {
         </div>
 
         <!-- Card Footer -->
-        <div class="p-3.5 pt-0 border-t border-dark-800/80 mt-2 flex items-center justify-between text-xs text-slate-400">
-          <span class="text-[11px] text-slate-500 font-mono">${sections.length} chapters</span>
+        <div class="p-3.5 pt-0 border-t border-obsidian-800/80 mt-2 flex items-center justify-between text-xs text-zinc-400">
+          <span class="text-[11px] text-zinc-500 font-mono">${sections.length} chapters</span>
           <div class="flex items-center gap-1.5">
-            <button onclick="openReaderForVideo('${v.video_id}')" title="Read Transcript" class="px-2.5 py-1 rounded-md bg-dark-800 hover:bg-dark-750 text-brand-400 text-xs font-medium flex items-center gap-1 transition-colors border border-dark-700">
+            <button onclick="openReaderForVideo('${v.video_id}')" title="Read Transcript" class="px-2.5 py-1 rounded-md bg-obsidian-800 hover:bg-obsidian-750 text-amber-400 text-xs font-medium flex items-center gap-1.5 transition-colors border border-obsidian-700">
               <i data-lucide="book-open" class="w-3.5 h-3.5"></i>
               <span>Read</span>
             </button>
-            <button onclick="deleteVideoById(${v.id})" title="Delete" class="p-1 rounded-md hover:bg-dark-800 text-slate-500 hover:text-rose-400 transition-colors">
+            <button onclick="deleteVideoById(${v.id})" title="Delete" class="p-1 rounded-md hover:bg-obsidian-800 text-zinc-500 hover:text-rose-400 transition-colors">
               <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
             </button>
           </div>
@@ -254,12 +254,12 @@ function renderReaderView(video) {
   document.getElementById("reader-duration").textContent = `${Math.floor(video.duration_seconds / 60)}m ${video.duration_seconds % 60}s`;
   document.getElementById("reader-yt-link").href = `https://www.youtube.com/watch?v=${video.video_id}`;
 
-  // 3-Bullet Takeaways
+  // Executive Takeaways
   const bulletsEl = document.getElementById("reader-bullets");
   bulletsEl.innerHTML = (video.summary_bullets || []).map(b => `
-    <li class="flex items-start gap-2.5">
-      <i data-lucide="check" class="w-4 h-4 text-brand-400 shrink-0 mt-0.5"></i>
-      <span class="font-medium text-slate-100">${b}</span>
+    <li class="flex items-start gap-3">
+      <span class="text-amber-400 font-serif font-bold text-base leading-none mt-0.5 select-none">—</span>
+      <span class="font-normal text-zinc-200 leading-relaxed text-sm sm:text-base">${b}</span>
     </li>
   `).join("");
 
@@ -269,8 +269,8 @@ function renderReaderView(video) {
   if (video.key_concepts && video.key_concepts.length > 0) {
     conceptsContainer.classList.remove("hidden");
     conceptsEl.innerHTML = video.key_concepts.map(c => `
-      <div class="bg-dark-900 border border-dark-700/80 p-3 rounded-xl text-xs">
-        <span class="text-slate-200 font-medium">${c}</span>
+      <div class="bg-obsidian-850 border border-obsidian-750 px-3 py-2 rounded-lg text-xs font-mono text-zinc-300">
+        <span>${c}</span>
       </div>
     `).join("");
   } else {
@@ -279,7 +279,7 @@ function renderReaderView(video) {
 
   // Section-by-Section Smart Transcript
   const sections = video.smart_transcript || video.topic_notes || [];
-  document.getElementById("section-count-badge").textContent = `${sections.length} sections`;
+  document.getElementById("section-count-badge").textContent = `${sections.length} chapters`;
   renderTranscriptSections(sections, video.video_id);
 
   // Synthesis
@@ -293,7 +293,7 @@ function renderTranscriptSections(sections, videoId) {
   
   if (!sections || sections.length === 0) {
     container.innerHTML = `
-      <div class="bg-dark-900 border border-dark-700/60 rounded-xl p-6 text-center text-slate-400 text-xs">
+      <div class="bg-obsidian-900 border border-obsidian-800 rounded-xl p-6 text-center text-zinc-400 text-xs font-mono">
         No chapter breakdown available for this video.
       </div>
     `;
@@ -309,23 +309,23 @@ function renderTranscriptSections(sections, videoId) {
     const polishedText = sec.polished_text || sec.summary || "";
 
     return `
-      <div class="transcript-section-card bg-dark-900 border border-dark-700/60 rounded-xl p-5 shadow-sm space-y-3 transition-colors hover:border-slate-700" data-text="${(title + ' ' + crispPoints.join(' ') + ' ' + polishedText).toLowerCase()}">
+      <div class="transcript-section-card bg-obsidian-900/80 border border-obsidian-800 rounded-xl p-5 shadow-sm space-y-3.5 transition-colors hover:border-obsidian-700" data-text="${(title + ' ' + crispPoints.join(' ') + ' ' + polishedText).toLowerCase()}">
         
         <!-- Header: Timestamp + Title -->
-        <div class="flex items-center gap-2.5 pb-2 border-b border-dark-800">
-          <a href="${jumpUrl}" target="_blank" title="Jump to ${tsLabel} on YouTube" class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 font-mono text-xs font-semibold border border-emerald-500/20 transition-colors">
-            <i data-lucide="play" class="w-3 h-3 fill-emerald-400"></i>
+        <div class="flex items-center gap-3 pb-2.5 border-b border-obsidian-800/80">
+          <a href="${jumpUrl}" target="_blank" title="Jump to ${tsLabel} on YouTube" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 font-mono text-xs font-medium border border-amber-500/20 transition-colors">
+            <i data-lucide="play" class="w-3 h-3 fill-amber-400"></i>
             <span>${tsLabel}</span>
           </a>
-          <h3 class="font-semibold text-white text-sm tracking-tight">${title}</h3>
+          <h3 class="font-serif font-medium text-zinc-100 text-base sm:text-lg tracking-tight">${title}</h3>
         </div>
 
         <!-- Crisp Bullet Points -->
         ${crispPoints.length > 0 ? `
-          <ul class="space-y-1.5 pl-0.5">
+          <ul class="space-y-2 pl-0.5">
             ${crispPoints.map(pt => `
-              <li class="flex items-start gap-2 text-xs sm:text-sm text-slate-100 leading-snug">
-                <span class="text-brand-400 font-bold select-none">•</span>
+              <li class="flex items-start gap-2.5 text-xs sm:text-sm text-zinc-200 leading-relaxed">
+                <span class="text-amber-500/80 font-bold select-none">•</span>
                 <span>${pt}</span>
               </li>
             `).join("")}
@@ -334,7 +334,7 @@ function renderTranscriptSections(sections, videoId) {
 
         <!-- Polished Reading Paragraph -->
         ${polishedText ? `
-          <p class="text-xs text-slate-400 leading-relaxed pt-2.5 border-t border-dark-800/80">
+          <p class="text-sm text-zinc-400 font-serif leading-relaxed pt-3 border-t border-obsidian-800/60">
             ${polishedText}
           </p>
         ` : ''}
