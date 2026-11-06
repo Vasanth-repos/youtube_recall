@@ -1,8 +1,15 @@
-// YouTube Recall Content Script
+// YouTube Recall - Automatic Watch & Transcribe Content Script
 (function() {
   const SERVER_URL = "http://localhost:8000";
-  let injectedButton = null;
+  const AUTO_TRIGGER_SECONDS = 8; // Automatically transcribes after 8 seconds of active watch time
+  
   let currentVideoId = null;
+  let activeWatchSeconds = 0;
+  let isTranscribing = false;
+  let hasAutoTriggered = false;
+  let activeToast = null;
+  let injectedButton = null;
+  let processedVideosCache = new Set();
 
   function getVideoId() {
     const urlParams = new URLSearchParams(window.location.search);
@@ -13,31 +20,137 @@
     return document.querySelector("video");
   }
 
-  function getWatchStats() {
-    const video = getVideoPlayer();
-    if (!video) return { currentTime: 0, duration: 0, percent: 0 };
-    const cur = Math.floor(video.currentTime || 0);
-    const dur = Math.floor(video.duration || 0);
-    const pct = dur > 0 ? (cur / dur * 100) : 0;
-    return { currentTime: cur, duration: dur, percent: pct };
+  function getVideoTitle() {
+    const titleEl = document.querySelector("h1.ytd-watch-metadata yt-formatted-string") ||
+                    document.querySelector("h1.title yt-formatted-string") ||
+                    document.querySelector("#title h1");
+    if (titleEl && titleEl.textContent) {
+      return titleEl.textContent.trim();
+    }
+    return document.title.replace(" - YouTube", "").trim();
   }
 
+  // Load previously processed video IDs from chrome storage
+  if (chrome.storage && chrome.storage.local) {
+    chrome.storage.local.get(["processed_videos"], (res) => {
+      if (res && res.processed_videos) {
+        processedVideosCache = new Set(res.processed_videos);
+      }
+    });
+  }
+
+  function markVideoProcessed(id) {
+    processedVideosCache.add(id);
+    if (chrome.storage && chrome.storage.local) {
+      chrome.storage.local.set({ processed_videos: Array.from(processedVideosCache) });
+    }
+  }
+
+  // Show floating toast notification on YouTube page
+  function showToast(htmlContent, isClickable = false, autoDismissMs = 0) {
+    if (activeToast && activeToast.parentNode) {
+      activeToast.parentNode.removeChild(activeToast);
+      activeToast = null;
+    }
+
+    const toast = document.createElement("div");
+    toast.className = "yt-recall-toast";
+    toast.innerHTML = htmlContent;
+
+    if (isClickable) {
+      toast.title = "Click to open AI Smart Transcript in Reader";
+      toast.addEventListener("click", () => {
+        window.open(`${SERVER_URL}`, "_blank");
+      });
+    }
+
+    document.body.appendChild(toast);
+    activeToast = toast;
+
+    if (autoDismissMs > 0) {
+      setTimeout(() => {
+        if (activeToast === toast) {
+          toast.classList.add("fade-out");
+          setTimeout(() => {
+            if (toast.parentNode) toast.parentNode.removeChild(toast);
+          }, 300);
+        }
+      }, autoDismissMs);
+    }
+  }
+
+  // Automatic Video Transcription Trigger
+  async function autoTranscribeVideo(videoId, title) {
+    if (isTranscribing || hasAutoTriggered) return;
+    if (processedVideosCache.has(videoId)) {
+      updateButtonState("saved");
+      return;
+    }
+
+    isTranscribing = true;
+    hasAutoTriggered = true;
+    updateButtonState("loading");
+
+    showToast(`
+      <div class="yt-recall-pulse"></div>
+      <div>
+        <div style="font-weight: 700; font-size: 13px; color: #4ade80;">✨ Auto-Transcribing Video</div>
+        <div style="font-size: 11px; color: #94a3b8; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${title}</div>
+      </div>
+    `, false, 0);
+
+    try {
+      const response = await fetch(`${SERVER_URL}/api/videos/intake`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          video_url_or_id: videoId,
+          watch_time_seconds: activeWatchSeconds || 15,
+          watch_percent: 100,
+          force_process: true
+        })
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        markVideoProcessed(videoId);
+        updateButtonState("saved");
+
+        showToast(`
+          <div style="font-size: 16px;">✓</div>
+          <div>
+            <div style="font-weight: 700; font-size: 13px; color: #4ade80;">Smart Transcript Ready!</div>
+            <div style="font-size: 11px; color: #e2e8f0;">Click to open clean AI notes →</div>
+          </div>
+        `, true, 9000);
+      } else {
+        updateButtonState("error");
+        showToast(`<span>⚠️ Intake Notice: ${data.detail || 'Could not process'}</span>`, false, 4000);
+      }
+    } catch (err) {
+      console.warn("YouTube Recall Backend is offline at", SERVER_URL);
+      updateButtonState("offline");
+      showToast(`<span>❌ Backend offline at localhost:8000</span>`, false, 4000);
+    } finally {
+      isTranscribing = false;
+    }
+  }
+
+  // Inject or update button inside YouTube player controls
   function injectSaveButton() {
     const videoId = getVideoId();
     if (!videoId) return;
 
-    if (injectedButton && document.contains(injectedButton) && currentVideoId === videoId) {
-      return;
-    }
-
-    currentVideoId = videoId;
-
-    // Target container: below video player action buttons (#top-row or #owner or #actions)
     const targetContainer = document.querySelector("#actions #top-level-buttons-computed") ||
                             document.querySelector("#owner") ||
                             document.querySelector(".ytp-right-controls");
 
     if (!targetContainer) return;
+
+    if (injectedButton && document.contains(injectedButton) && currentVideoId === videoId) {
+      return;
+    }
 
     if (injectedButton && injectedButton.parentNode) {
       injectedButton.parentNode.removeChild(injectedButton);
@@ -47,80 +160,102 @@
     injectedButton.id = "yt-recall-save-btn";
     injectedButton.className = "yt-recall-btn";
     injectedButton.innerHTML = "<span>✨ AI Smart Transcript</span>";
-    injectedButton.title = "Clean transcript, remove verbal fluff, and generate crisp on-to-the-point notes";
+    injectedButton.title = "View or generate crisp AI-powered transcript";
 
-    injectedButton.addEventListener("click", async (e) => {
+    injectedButton.addEventListener("click", (e) => {
       e.preventDefault();
       e.stopPropagation();
-      await triggerSave(true);
+      if (processedVideosCache.has(videoId)) {
+        window.open(`${SERVER_URL}`, "_blank");
+      } else {
+        autoTranscribeVideo(videoId, getVideoTitle());
+      }
     });
 
     targetContainer.appendChild(injectedButton);
+
+    if (processedVideosCache.has(videoId)) {
+      updateButtonState("saved");
+    }
   }
 
-  async function triggerSave(force = false) {
+  function updateButtonState(state) {
     if (!injectedButton) return;
-    const stats = getWatchStats();
-    const videoId = getVideoId();
-
-    injectedButton.classList.add("loading");
-    injectedButton.innerHTML = "<span>⏳ Synthesizing...</span>";
-
-    try {
-      const response = await fetch(`${SERVER_URL}/api/videos/intake`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          video_url_or_id: videoId,
-          watch_time_seconds: stats.currentTime,
-          duration_seconds: stats.duration,
-          watch_percent: stats.percent,
-          force_process: force
-        })
-      });
-
-      const data = await response.json();
-      if (response.ok) {
-        injectedButton.classList.remove("loading");
-        injectedButton.classList.add("saved");
-        injectedButton.innerHTML = "<span>✓ Saved to Recall</span>";
-      } else {
-        injectedButton.classList.remove("loading");
-        injectedButton.innerHTML = "<span>⚠️ " + (data.detail ? data.detail.slice(0, 20) : "Failed") + "</span>";
-        setTimeout(() => {
-          injectedButton.innerHTML = "<span>🧠 Save to Learn</span>";
-        }, 3000);
-      }
-    } catch (err) {
-      injectedButton.classList.remove("loading");
+    if (state === "loading") {
+      injectedButton.className = "yt-recall-btn loading";
+      injectedButton.innerHTML = "<span>⏳ Distilling...</span>";
+    } else if (state === "saved") {
+      injectedButton.className = "yt-recall-btn saved";
+      injectedButton.innerHTML = "<span>✓ Open Smart Transcript</span>";
+      injectedButton.title = "Transcript is ready! Click to open reader.";
+    } else if (state === "offline") {
+      injectedButton.className = "yt-recall-btn";
       injectedButton.innerHTML = "<span>❌ Server Offline</span>";
-      console.warn("YouTube Recall Backend is not running at", SERVER_URL);
-      setTimeout(() => {
-        injectedButton.innerHTML = "<span>🧠 Save to Learn</span>";
-      }, 3000);
+    }
+  }
+
+  // Watch time monitor & automatic trigger
+  function handlePlaybackTracking() {
+    const videoId = getVideoId();
+    if (!videoId) return;
+
+    // Reset state on video change
+    if (currentVideoId !== videoId) {
+      currentVideoId = videoId;
+      activeWatchSeconds = 0;
+      hasAutoTriggered = false;
+      isTranscribing = false;
+      injectSaveButton();
+    }
+
+    const video = getVideoPlayer();
+    if (!video) return;
+
+    // Only count active playback
+    if (!video.paused && !video.ended && video.playbackRate > 0) {
+      activeWatchSeconds += 1;
+      
+      // Automatic trigger threshold reached!
+      if (activeWatchSeconds >= AUTO_TRIGGER_SECONDS && !hasAutoTriggered && !isTranscribing) {
+        if (!processedVideosCache.has(videoId)) {
+          const title = getVideoTitle();
+          autoTranscribeVideo(videoId, title);
+        }
+      }
     }
   }
 
   // Listen for messages from popup
   chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    const videoId = getVideoId();
     if (request.action === "get_status") {
-      const stats = getWatchStats();
-      const videoId = getVideoId();
-      const title = document.title.replace(" - YouTube", "");
+      const video = getVideoPlayer();
+      const cur = video ? Math.floor(video.currentTime || 0) : 0;
+      const dur = video ? Math.floor(video.duration || 0) : 0;
       sendResponse({
         videoId: videoId,
-        title: title,
-        stats: stats
+        title: getVideoTitle(),
+        activeWatchSeconds: activeWatchSeconds,
+        isProcessed: processedVideosCache.has(videoId),
+        isTranscribing: isTranscribing,
+        currentTime: cur,
+        duration: dur
       });
-    } else if (request.action === "save_video") {
-      triggerSave(request.force).then(() => {
+    } else if (request.action === "manual_trigger") {
+      autoTranscribeVideo(videoId, getVideoTitle()).then(() => {
         sendResponse({ success: true });
       });
-      return true; // async
+      return true;
     }
   });
 
-  // Run on page load and URL change (YouTube is a SPA)
-  setInterval(injectSaveButton, 1500);
+  // Track playback every second
+  setInterval(handlePlaybackTracking, 1000);
+  // Re-check button injection on YouTube SPA navigation
+  setInterval(injectSaveButton, 2000);
+  window.addEventListener("yt-navigate-finish", () => {
+    activeWatchSeconds = 0;
+    hasAutoTriggered = false;
+    setTimeout(injectSaveButton, 800);
+  });
 })();
-

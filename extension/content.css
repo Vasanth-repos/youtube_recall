@@ -40,3 +40,55 @@
   cursor: wait;
 }
 
+/* Floating Toast Notification */
+.yt-recall-toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  background: #0d131f;
+  color: #f8fafc;
+  border: 1px solid rgba(34, 197, 94, 0.6);
+  border-radius: 12px;
+  padding: 12px 18px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 13px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.7), 0 0 15px rgba(34, 197, 94, 0.25);
+  z-index: 999999;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  animation: ytRecallSlideUp 0.25s ease;
+  transition: all 0.2s ease;
+}
+
+.yt-recall-toast:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 14px 30px -5px rgba(0, 0, 0, 0.8), 0 0 20px rgba(34, 197, 94, 0.4);
+}
+
+.yt-recall-toast.fade-out {
+  opacity: 0;
+  transform: translateY(10px);
+  pointer-events: none;
+}
+
+.yt-recall-pulse {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #22c55e;
+  box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7);
+  animation: ytPulse 1.5s infinite;
+}
+
+@keyframes ytRecallSlideUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes ytPulse {
+  0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7); }
+  70% { transform: scale(1); box-shadow: 0 0 0 8px rgba(34, 197, 94, 0); }
+  100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+}

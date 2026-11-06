@@ -188,9 +188,9 @@ class AIService:
         )
 
         # 1. Try Gemini Free Tier
-        if active_provider == "gemini" or (api_key and "AIza" in api_key) or settings.GEMINI_API_KEY:
+        gemini_key = api_key or settings.GEMINI_API_KEY
+        if (active_provider == "gemini" or gemini_key) and gemini_key:
             try:
-                gemini_key = api_key if (api_key and "AIza" in api_key) else settings.GEMINI_API_KEY
                 result = cls._call_gemini(prompt, gemini_key)
                 if result:
                     return cls._normalize_result(result, chunks)
@@ -241,14 +241,35 @@ class AIService:
 
     @classmethod
     def _call_gemini(cls, prompt: str, api_key: str) -> Optional[Dict[str, Any]]:
-        import google.generativeai as genai
-        genai.configure(api_key=api_key)
-        model = genai.GenerativeModel("gemini-2.0-flash")
-        response = model.generate_content(
-            prompt,
-            generation_config={"response_mime_type": "application/json"}
-        )
-        return cls._parse_json_response(response.text)
+        """Calls Google AI Studio / Gemini API using candidate models with automatic fallback."""
+        candidate_models = ["gemini-3.5-flash", "gemini-3.5-flash-lite", "gemini-3.8-flash"]
+        for model in candidate_models:
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
+            payload = {
+                "contents": [{"parts": [{"text": prompt}]}],
+                "generationConfig": {
+                    "response_mime_type": "application/json",
+                    "temperature": 0.2
+                }
+            }
+            try:
+                resp = requests.post(url, json=payload, timeout=40)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    candidates = data.get("candidates", [])
+                    if candidates:
+                        parts = candidates[0].get("content", {}).get("parts", [])
+                        if parts:
+                            text = parts[0].get("text", "")
+                            parsed = cls._parse_json_response(text)
+                            if parsed:
+                                logger.info(f"Successfully synthesized recall notes with Google AI Studio model '{model}'")
+                                return parsed
+                else:
+                    logger.warning(f"Gemini model {model} returned HTTP {resp.status_code}: {resp.text[:180]}")
+            except Exception as err:
+                logger.warning(f"Error querying Gemini model {model}: {err}")
+        return None
 
     @classmethod
     def _call_groq(cls, prompt: str, api_key: str) -> Optional[Dict[str, Any]]:

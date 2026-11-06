@@ -1,8 +1,14 @@
 import os
 from pathlib import Path
 from typing import List
+from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent
+ROOT_DIR = BASE_DIR.parent
+
+# Automatically load environment variables from .env
+load_dotenv(ROOT_DIR / ".env")
+load_dotenv(BASE_DIR / ".env")
 
 class AppConfig:
     DATABASE_URL: str = os.getenv("DATABASE_URL", f"sqlite:///{BASE_DIR}/recall.db")
@@ -11,8 +17,8 @@ class AppConfig:
     PORT: int = int(os.getenv("PORT", "8000"))
 
     # AI Configuration (Free tiers supported)
-    DEFAULT_AI_PROVIDER: str = os.getenv("DEFAULT_AI_PROVIDER", "local_offline") # "gemini", "groq", "ollama", "local_offline"
     GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
+    DEFAULT_AI_PROVIDER: str = os.getenv("DEFAULT_AI_PROVIDER", "gemini" if os.getenv("GEMINI_API_KEY") else "local_offline") # "gemini", "groq", "ollama", "local_offline"
     GROQ_API_KEY: str = os.getenv("GROQ_API_KEY", "")
     OLLAMA_BASE_URL: str = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
     OLLAMA_MODEL: str = os.getenv("OLLAMA_MODEL", "llama3")

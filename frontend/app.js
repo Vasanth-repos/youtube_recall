@@ -56,6 +56,17 @@ async function loadVideos() {
     renderVideosGrid();
     loadStats();
 
+    // Check if query parameter has ?v= or ?video_id=
+    const params = new URLSearchParams(window.location.search);
+    const targetV = params.get("v") || params.get("video_id");
+    if (targetV) {
+      const match = allVideos.find(v => v.video_id === targetV || String(v.id) === targetV);
+      if (match) {
+        openReaderForVideo(match.video_id);
+        return;
+      }
+    }
+
     // Auto-select first video into Reader if none selected
     if (!currentViewingVideo && allVideos.length > 0) {
       currentViewingVideo = allVideos[0];
