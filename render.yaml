@@ -11,3 +11,4 @@ services:
         sync: false
       - key: APP_ENV
         value: production
+

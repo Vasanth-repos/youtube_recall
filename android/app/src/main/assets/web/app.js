@@ -379,6 +379,7 @@ document.addEventListener("DOMContentLoaded", () => {
   loadVideos();
   loadSettings();
   loadAccountStatus();
+  checkAutoCaptureStatus();
   handleIncomingShareTarget();
 
   // Register PWA Service Worker for Mobile & Offline Support
@@ -390,6 +391,7 @@ document.addEventListener("DOMContentLoaded", () => {
   window.addEventListener("focus", () => {
     loadVideos();
     loadStats();
+    checkAutoCaptureStatus();
   });
 
   // Background polling every 15s when active tab is visible
@@ -397,6 +399,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (document.visibilityState === "visible") {
       loadVideos();
       loadStats();
+      checkAutoCaptureStatus();
     }
   }, 15000);
 });
@@ -1677,6 +1680,126 @@ function updateModeBadge() {
     badge.textContent = "💻 Local Laptop LAN";
     badge.className = "px-2 py-0.5 rounded text-[10px] font-mono bg-emerald-500/10 text-emerald-400 border border-emerald-500/20";
   }
+}
+
+// ==========================================================================
+// Method 1: Android Zero-Click YouTube Auto-Capture Controller
+// ==========================================================================
+
+async function checkAutoCaptureStatus() {
+  const badge = document.getElementById("auto-capture-badge");
+  const banner = document.getElementById("banner-auto-capture");
+  const permPrompt = document.getElementById("notification-permission-prompt");
+  const toggle = document.getElementById("toggle-auto-capture");
+
+  if (!window.AndroidBridge) {
+    if (badge) {
+      badge.textContent = "Android APK Feature";
+      badge.className = "px-2.5 py-0.5 rounded-full text-[10px] font-mono bg-zinc-800 text-zinc-400 border border-zinc-700";
+    }
+    if (banner) banner.classList.add("hidden");
+    if (permPrompt) permPrompt.classList.add("hidden");
+    return;
+  }
+
+  // Running inside Android Native App!
+  let isGranted = false;
+  let isEnabled = true;
+
+  try {
+    if (typeof window.AndroidBridge.isNotificationAccessGranted === "function") {
+      isGranted = window.AndroidBridge.isNotificationAccessGranted();
+    }
+    if (typeof window.AndroidBridge.isAutoCaptureEnabled === "function") {
+      isEnabled = window.AndroidBridge.isAutoCaptureEnabled();
+    }
+  } catch (e) {
+    console.warn("Could not query AndroidBridge notification status", e);
+  }
+
+  if (toggle) toggle.checked = isEnabled;
+
+  if (badge) {
+    if (!isEnabled) {
+      badge.textContent = "Paused";
+      badge.className = "px-2.5 py-0.5 rounded-full text-[10px] font-mono bg-zinc-800 text-zinc-400 border border-zinc-700";
+    } else if (isGranted) {
+      badge.textContent = "● Active & Listening";
+      badge.className = "px-2.5 py-0.5 rounded-full text-[10px] font-mono bg-emerald-500/10 text-emerald-400 border border-emerald-500/20";
+    } else {
+      badge.textContent = "⚠️ Permission Needed";
+      badge.className = "px-2.5 py-0.5 rounded-full text-[10px] font-mono bg-amber-500/10 text-amber-400 border border-amber-500/20";
+    }
+  }
+
+  // Update Settings permission prompt
+  if (permPrompt) {
+    permPrompt.classList.remove("hidden");
+    const statusText = document.getElementById("notification-perm-status");
+    const grantBtn = permPrompt.querySelector("button");
+    if (isGranted) {
+      if (statusText) {
+        statusText.textContent = "✓ Notification Access Active:";
+        statusText.className = "text-emerald-400 font-medium";
+      }
+      if (grantBtn) grantBtn.classList.add("hidden");
+    } else {
+      if (statusText) {
+        statusText.textContent = "Notification Access Required:";
+        statusText.className = "text-amber-400 font-medium";
+      }
+      if (grantBtn) grantBtn.classList.remove("hidden");
+    }
+  }
+
+  // Update Library banner
+  if (banner) {
+    const dismissed = sessionStorage.getItem("recall_dismiss_autocapture_banner");
+    if (!isGranted && !dismissed) {
+      banner.classList.remove("hidden");
+    } else {
+      banner.classList.add("hidden");
+    }
+  }
+
+  // Process any pending auto-captured videos queued while app was in background
+  try {
+    if (typeof window.AndroidBridge.popPendingAutoCapturedVideos === "function") {
+      const pendingJson = window.AndroidBridge.popPendingAutoCapturedVideos();
+      if (pendingJson && pendingJson !== "[]") {
+        const videoIds = JSON.parse(pendingJson);
+        if (Array.isArray(videoIds) && videoIds.length > 0) {
+          console.log("Processing pending auto-captured videos from Android:", videoIds);
+          for (const vid of videoIds) {
+            await autoIntakeSharedVideo(vid);
+          }
+        }
+      }
+    }
+  } catch (e) {
+    console.error("Error processing pending auto-captured videos:", e);
+  }
+}
+
+function requestNotificationAccess() {
+  if (window.AndroidBridge && typeof window.AndroidBridge.openNotificationAccessSettings === "function") {
+    window.AndroidBridge.openNotificationAccessSettings();
+  } else {
+    showToastNotification("Notification listener is available in the native Android app", "info");
+  }
+}
+
+function toggleAutoCapture(enabled) {
+  if (window.AndroidBridge && typeof window.AndroidBridge.setAutoCaptureEnabled === "function") {
+    window.AndroidBridge.setAutoCaptureEnabled(enabled);
+  }
+  checkAutoCaptureStatus();
+}
+
+function dismissAutoCaptureBanner() {
+  sessionStorage.setItem("recall_dismiss_autocapture_banner", "true");
+  const banner = document.getElementById("banner-auto-capture");
+  if (banner) banner.classList.add("hidden");
 }
 
 // Global Keyboard Navigation for Study Sessions

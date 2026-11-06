@@ -278,7 +278,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun extractYouTubeVideoId(text: String): String? {
-        val pattern = "(?:youtu\\.be/|youtube\\.com/(?:embed/|v/|watch\\?v=|watch\\?.+&v=|shorts/|live/))([\\w-]{11})"
+        val pattern = "(?:youtu\\.be/|youtube\\.com/(?:embed/|v/|watch\\?v=|watch\\?.+&v=|shorts/|live/)|[?&]v=)([\\w-]{11})"
         val matcher = Pattern.compile(pattern).matcher(text)
         return if (matcher.find()) {
             matcher.group(1)

@@ -1,12 +1,14 @@
 package com.youtuberecall.app
 
 import android.content.Context
+import android.content.Intent
 import android.content.SharedPreferences
 import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.webkit.JavascriptInterface
 import android.widget.Toast
+import org.json.JSONArray
 
 /**
  * JavaScript Bridge Interface exposed to Web UI as window.AndroidBridge
@@ -68,5 +70,56 @@ class WebAppInterface(
     @JavascriptInterface
     fun isAndroidNative(): Boolean {
         return true
+    }
+
+    @JavascriptInterface
+    fun isNotificationAccessGranted(): Boolean {
+        return try {
+            androidx.core.app.NotificationManagerCompat.getEnabledListenerPackages(activity)
+                .contains(activity.packageName)
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    @JavascriptInterface
+    fun openNotificationAccessSettings() {
+        try {
+            val intent = Intent("android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS").apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            }
+            activity.startActivity(intent)
+        } catch (e: Exception) {
+            activity.runOnUiThread {
+                Toast.makeText(activity, "Could not open Notification Settings: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    @JavascriptInterface
+    fun isAutoCaptureEnabled(): Boolean {
+        return prefs.getBoolean("auto_capture_enabled", true)
+    }
+
+    @JavascriptInterface
+    fun setAutoCaptureEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean("auto_capture_enabled", enabled).apply()
+        activity.runOnUiThread {
+            val msg = if (enabled) "Zero-Click Auto-Capture enabled" else "Zero-Click Auto-Capture disabled"
+            Toast.makeText(activity, msg, Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    @JavascriptInterface
+    fun popPendingAutoCapturedVideos(): String {
+        return try {
+            val pendingSet = prefs.getStringSet("pending_captured_vids", emptySet()) ?: emptySet()
+            if (pendingSet.isEmpty()) return "[]"
+            val jsonArray = JSONArray(pendingSet.toList())
+            prefs.edit().remove("pending_captured_vids").apply()
+            jsonArray.toString()
+        } catch (e: Exception) {
+            "[]"
+        }
     }
 }

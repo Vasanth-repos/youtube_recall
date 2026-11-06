@@ -2,10 +2,11 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- Network permissions for local and remote backend sync -->
+    <!-- Network & Notification permissions for local and remote backend sync -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.DOWNLOAD_WITHOUT_NOTIFICATION" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
         android:allowBackup="true"
@@ -54,6 +55,18 @@
             </intent-filter>
 
         </activity>
+
+        <!-- Zero-Click Background YouTube Playback Detector -->
+        <service
+            android:name=".YouTubeNotificationListener"
+            android:label="YouTube Recall Auto-Capture"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
+
     </application>
 
 </manifest>
