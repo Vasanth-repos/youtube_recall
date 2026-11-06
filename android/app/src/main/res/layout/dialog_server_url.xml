@@ -55,5 +55,14 @@
             android:textSize="11sp" />
     </LinearLayout>
 
+    <Button
+        android:id="@+id/btnPresetStandalone"
+        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="⚡ Standalone Mode (No Laptop Needed)"
+        android:textSize="12sp" />
+
 </LinearLayout>
 

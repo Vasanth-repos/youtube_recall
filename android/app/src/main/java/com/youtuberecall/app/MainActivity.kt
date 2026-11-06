@@ -34,7 +34,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
     private val PREFS_NAME = "recall_prefs"
     private val KEY_SERVER_URL = "server_url"
-    private val DEFAULT_SERVER_URL = "http://192.168.1.4:8000"
+    private val DEFAULT_SERVER_URL = ""
     val APP_ASSET_URL = "https://appassets.androidplatform.net/assets/index.html"
 
     var activeServerUrl: String = DEFAULT_SERVER_URL
@@ -72,11 +72,15 @@ class MainActivity : AppCompatActivity() {
 
     private fun saveServerUrl(url: String) {
         var cleanUrl = url.trim()
-        if (!cleanUrl.startsWith("http://") && !cleanUrl.startsWith("https://")) {
-            cleanUrl = "http://$cleanUrl"
-        }
-        if (cleanUrl.endsWith("/")) {
-            cleanUrl = cleanUrl.substring(0, cleanUrl.length - 1)
+        if (cleanUrl.equals("standalone", ignoreCase = true) || cleanUrl.equals("local", ignoreCase = true) || cleanUrl.isEmpty()) {
+            cleanUrl = ""
+        } else {
+            if (!cleanUrl.startsWith("http://") && !cleanUrl.startsWith("https://")) {
+                cleanUrl = "http://$cleanUrl"
+            }
+            if (cleanUrl.endsWith("/")) {
+                cleanUrl = cleanUrl.substring(0, cleanUrl.length - 1)
+            }
         }
         activeServerUrl = cleanUrl
         getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -286,8 +290,9 @@ class MainActivity : AppCompatActivity() {
         val etUrl = dialogView.findViewById<EditText>(R.id.etServerUrl)
         val btnPresetLan = dialogView.findViewById<Button>(R.id.btnPresetLan)
         val btnPresetEmulator = dialogView.findViewById<Button>(R.id.btnPresetEmulator)
+        val btnPresetStandalone = dialogView.findViewById<Button>(R.id.btnPresetStandalone)
 
-        etUrl.setText(activeServerUrl)
+        etUrl.setText(if (activeServerUrl.isEmpty()) "standalone" else activeServerUrl)
 
         btnPresetLan.setOnClickListener {
             etUrl.setText("http://192.168.1.4:8000")
@@ -295,6 +300,10 @@ class MainActivity : AppCompatActivity() {
 
         btnPresetEmulator.setOnClickListener {
             etUrl.setText("http://10.0.2.2:8000")
+        }
+
+        btnPresetStandalone.setOnClickListener {
+            etUrl.setText("standalone")
         }
 
         MaterialAlertDialogBuilder(this)

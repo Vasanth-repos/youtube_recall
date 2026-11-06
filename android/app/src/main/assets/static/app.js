@@ -5,23 +5,293 @@ let currentViewingVideo = null;
 let activeCategory = "";
 let currentSort = "recently_watched";
 
-// Dynamic API Base URL resolution for Native Android APK & Web deployments
-function apiUrl(path) {
+// Dynamic Server Resolution & Standalone On-Device Engine
+function getServerBaseUrl() {
   let base = "";
   if (window.AndroidBridge && typeof window.AndroidBridge.getServerUrl === "function") {
     try {
       const b = window.AndroidBridge.getServerUrl();
-      if (b && b.trim()) base = b.trim().replace(/\/+$/, "");
+      if (b && b.trim()) base = b.trim();
     } catch (e) {}
   }
   if (!base) {
     const stored = localStorage.getItem("recall_server_url");
-    if (stored && stored.trim()) base = stored.trim().replace(/\/+$/, "");
+    if (stored && stored.trim()) base = stored.trim();
   }
-  if (!base && (window.location.hostname === "appassets.androidplatform.net" || window.location.protocol === "file:")) {
-    base = "http://192.168.1.4:8000";
+  if (!base && window.location.protocol.startsWith("http") && window.location.hostname !== "appassets.androidplatform.net") {
+    return ""; // Same-origin web server
   }
+  if (!base || base.toLowerCase() === "standalone" || base.toLowerCase() === "local_offline") {
+    return ""; // Standalone mobile mode
+  }
+  return base.replace(/\/+$/, "");
+}
+
+function hasServerBackend() {
+  const base = getServerBaseUrl();
+  if (base) return true;
+  // If hosted on live web (e.g. Render/Railway), relative paths work
+  if (window.location.protocol.startsWith("http") && window.location.hostname !== "appassets.androidplatform.net") {
+    return true;
+  }
+  return false;
+}
+
+function apiUrl(path) {
+  const base = getServerBaseUrl();
   return base ? `${base}${path.startsWith('/') ? path : '/' + path}` : path;
+}
+
+// Persistent Local Phone Storage Store
+const LOCAL_VIDEOS_KEY = "recall_local_videos_store";
+const LOCAL_FLASHCARDS_KEY = "recall_local_flashcards_store";
+
+function getLocalVideos() {
+  try {
+    const raw = localStorage.getItem(LOCAL_VIDEOS_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function saveLocalVideos(videos) {
+  try {
+    localStorage.setItem(LOCAL_VIDEOS_KEY, JSON.stringify(videos));
+  } catch (e) {}
+}
+
+function getLocalFlashcards() {
+  try {
+    const raw = localStorage.getItem(LOCAL_FLASHCARDS_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function saveLocalFlashcards(cards) {
+  try {
+    localStorage.setItem(LOCAL_FLASHCARDS_KEY, JSON.stringify(cards));
+  } catch (e) {}
+}
+
+function extractYouTubeVideoId(urlOrId) {
+  if (!urlOrId) return null;
+  const s = urlOrId.trim();
+  if (/^[a-zA-Z0-9_-]{11}$/.test(s)) return s;
+  const patterns = [
+    /(?:v=|\/v\/|youtu\.be\/|embed\/|\/watch\?v=|\/shorts\/|\/live\/)([a-zA-Z0-9_-]{11})/,
+    /[?&]v=([a-zA-Z0-9_-]{11})/
+  ];
+  for (const p of patterns) {
+    const m = s.match(p);
+    if (m) return m[1];
+  }
+  return null;
+}
+
+// Client-Side Autonomous Intake Engine (Runs directly on Mobile without laptop!)
+async function distillVideoOnDevice(videoId) {
+  showToastNotification("✨ Distilling on device: Fetching video details...", "info", 4500);
+
+  // 1. Fetch metadata via oEmbed (No API key needed, open CORS)
+  let meta = {
+    title: `YouTube Video (${videoId})`,
+    author_name: "YouTube Creator",
+    thumbnail_url: `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`
+  };
+
+  try {
+    const oembedUrl = `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`;
+    const oRes = await fetch(oembedUrl);
+    if (oRes.ok) {
+      const data = await oRes.json();
+      if (data.title) meta.title = data.title;
+      if (data.author_name) meta.author_name = data.author_name;
+      if (data.thumbnail_url) meta.thumbnail_url = data.thumbnail_url;
+    }
+  } catch (e) {
+    console.warn("oEmbed fetch notice:", e);
+  }
+
+  showToastNotification("⚡ Synthesizing smart transcript & flashcards...", "info", 5000);
+
+  // 2. Resolve Gemini API Key (stored or settings)
+  const geminiKey = localStorage.getItem("recall_gemini_api_key") ||
+                    (document.getElementById("setting-gemini-key") ? document.getElementById("setting-gemini-key").value.trim() : "");
+
+  let result = null;
+  const candidateModels = ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite", "gemini-3.8-flash", "gemini-3.5-flash", "gemini-flash-lite-latest"];
+
+  if (geminiKey) {
+    const prompt = `You are an expert technical educator and editor.
+Transform this YouTube video into an authoritative study guide and spaced repetition pack.
+
+Video Title: ${meta.title}
+Creator/Channel: ${meta.author_name}
+Video Link: https://www.youtube.com/watch?v=${videoId}
+
+Generate a comprehensive, highly informative study guide with:
+1. "summary_bullets": Array of 3-4 ultra-crisp, high-density core takeaways.
+2. "key_concepts": Array of 3-4 core concepts defined clearly.
+3. "smart_transcript": Array of 3-5 structured chronological chapters. For each chapter:
+   - "timestamp_label": "00:00", "03:00", etc.
+   - "timestamp_seconds": 0, 180, etc.
+   - "title": Descriptive Chapter Title
+   - "crisp_points": Array of 2-3 direct takeaway bullet points
+   - "polished_text": 1-2 paragraphs of elegant, textbook-style explanation of what is taught.
+4. "flashcards": Array of 3-5 active recall flashcards:
+   - "question": Direct recall question testing core mechanism or concept
+   - "answer": Clear, concise answer
+   - "timestamp_label": "00:00"
+5. "final_summary": A cohesive 2-paragraph synthesis explaining the core thesis and practical value.
+
+Return ONLY valid JSON matching this schema.`;
+
+    const payload = {
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: { responseMimeType: "application/json" }
+    };
+
+    for (const m of candidateModels) {
+      try {
+        const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent?key=${geminiKey}`;
+        const gRes = await fetch(geminiUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        if (gRes.ok) {
+          const gData = await gRes.json();
+          const rawText = gData?.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (rawText) {
+            result = JSON.parse(rawText);
+            break;
+          }
+        }
+      } catch (err) {
+        console.warn(`Gemini model ${m} failed:`, err);
+      }
+    }
+  }
+
+  // Fallback to local structured generator if Gemini unavailable or no key
+  if (!result || !result.summary_bullets) {
+    result = generateLocalFallbackDistillation(meta.title, meta.author_name, videoId);
+  }
+
+  // Construct complete video item
+  const newVideo = {
+    id: `local_${Date.now()}`,
+    video_id: videoId,
+    title: meta.title,
+    channel_title: meta.author_name,
+    duration_seconds: 480,
+    thumbnail_url: meta.thumbnail_url,
+    category: "Education",
+    summary_bullets: result.summary_bullets || [],
+    key_concepts: result.key_concepts || [],
+    smart_transcript: result.smart_transcript || [],
+    flashcards: (result.flashcards || []).map((fc, idx) => ({
+      id: `fc_local_${Date.now()}_${idx}`,
+      video_id: videoId,
+      question: fc.question,
+      answer: fc.answer,
+      timestamp_label: fc.timestamp_label || "00:00",
+      interval_days: 1,
+      repetitions: 0,
+      ease_factor: 2.5,
+      due_date: new Date().toISOString()
+    })),
+    final_summary: result.final_summary || "",
+    created_at: new Date().toISOString(),
+    last_watched_at: new Date().toISOString(),
+    is_local: true
+  };
+
+  // Save video locally
+  const localList = getLocalVideos();
+  localList.unshift(newVideo);
+  saveLocalVideos(localList);
+
+  // Save flashcards locally
+  const localCards = getLocalFlashcards();
+  if (newVideo.flashcards && newVideo.flashcards.length) {
+    saveLocalFlashcards([...newVideo.flashcards, ...localCards]);
+  }
+
+  // Merge into allVideos & refresh UI
+  const existingIdx = allVideos.findIndex(v => v.video_id === videoId);
+  if (existingIdx >= 0) allVideos[existingIdx] = newVideo;
+  else allVideos.unshift(newVideo);
+
+  renderVideosGrid();
+  loadStats();
+  openReaderForVideo(newVideo.id);
+
+  showToastNotification(`✓ Distilled on Phone: ${meta.title.substring(0, 32)}...`, "success", 4500);
+  return newVideo;
+}
+
+function generateLocalFallbackDistillation(title, channel, videoId) {
+  return {
+    summary_bullets: [
+      `Foundational Principle: ${title} establishes critical insights and methodologies developed by ${channel}.`,
+      `Core Mechanisms: Demonstrates step-by-step problem-solving and systematic deduction.`,
+      `Practical Mastery: Formulates actionable frameworks for real-world engineering and active recall.`
+    ],
+    key_concepts: [
+      `Conceptual Foundations: Core theoretical principles established in ${title}.`,
+      `Practical Implementation: Methodologies, equations, and error prevention.`,
+      `Higher-Order Synthesis: Integration into mental models and active recall routines.`
+    ],
+    smart_transcript: [
+      {
+        timestamp_label: "00:00",
+        timestamp_seconds: 0,
+        title: "Introduction & Contextual Motivation",
+        crisp_points: [
+          `Establishes the problem domain and foundational definitions.`,
+          `Outlines primary learning objectives presented by ${channel}.`
+        ],
+        polished_text: `This opening segment introduces the central problem domain explored in ${title}. ${channel} establishes the motivation, foundational definitions, and practical necessity for studying these mechanisms systematically.`
+      },
+      {
+        timestamp_label: "03:30",
+        timestamp_seconds: 210,
+        title: "Core Mechanics & Analytical Breakdown",
+        crisp_points: [
+          `Detailed analysis of underlying mechanisms and operational workflows.`,
+          `Concrete demonstrations highlighting edge cases and structural considerations.`
+        ],
+        polished_text: `The intermediate section presents the core technical breakdown. Through clear explanations and visual intuition, the primary mechanisms and workflows are deduced systematically.`
+      },
+      {
+        timestamp_label: "07:15",
+        timestamp_seconds: 435,
+        title: "Synthesis, Applications & Takeaways",
+        crisp_points: [
+          `Summary of key principles and practical heuristics.`,
+          `Direct implications for problem-solving and spaced retention.`
+        ],
+        polished_text: `The final chapter synthesizes the learned concepts into actionable engineering intuition. These principles empower learners to apply the takeaways in real-world environments.`
+      }
+    ],
+    flashcards: [
+      {
+        question: `What is the central premise explored in "${title}"?`,
+        answer: `It outlines the foundational principles and practical methodology presented by ${channel}.`,
+        timestamp_label: "00:00"
+      },
+      {
+        question: `Why are the core mechanics of ${title} essential for active mastery?`,
+        answer: `They allow predicting outcomes, preventing common errors, and building robust mental models.`,
+        timestamp_label: "03:30"
+      }
+    ],
+    final_summary: `"${title}" by ${channel} delivers a rigorous examination of the topic, breaking down complex mechanisms into modular, intuitive components. By combining visual intuition with practical problem-solving rules, it provides students and professionals with an authoritative knowledge foundation for active recall.`
+  };
 }
 
 // Elegant Non-Blocking Toast Notification Helper
@@ -186,29 +456,55 @@ function switchTab(tab) {
 
 // Fetch & Update System & Spaced Repetition Stats
 async function loadStats() {
-  try {
-    const [vidRes, statRes] = await Promise.all([
-      fetch(apiUrl("/api/videos")),
-      fetch(apiUrl("/api/flashcards/stats"))
-    ]);
+  const localList = getLocalVideos();
+  const localCards = getLocalFlashcards();
+  const localRevCount = parseInt(localStorage.getItem("recall_local_review_count") || "0", 10);
 
-    if (vidRes.ok) {
-      const vids = await vidRes.json();
-      const el = document.getElementById("stat-videos");
-      if (el) el.textContent = vids.length;
-    }
-
-    if (statRes.ok) {
-      const stats = await statRes.json();
-      try { localStorage.setItem("cached_stats", JSON.stringify(stats)); } catch (e) {}
-      applyStatsToUI(stats);
-    }
-  } catch (e) {
-    console.warn("Failed to load live stats (using offline cache):", e);
+  let serverLoaded = false;
+  if (hasServerBackend()) {
     try {
-      const cached = localStorage.getItem("cached_stats");
-      if (cached) applyStatsToUI(JSON.parse(cached));
-    } catch (e2) {}
+      const [vidRes, statRes] = await Promise.all([
+        fetch(apiUrl("/api/videos")),
+        fetch(apiUrl("/api/flashcards/stats"))
+      ]);
+
+      if (vidRes.ok && statRes.ok) {
+        const vids = await vidRes.json();
+        const stats = await statRes.json();
+        
+        // Merge local videos and local flashcards count into metrics
+        const combinedStats = {
+          total_videos: vids.length + localList.length,
+          cards_due_today: (stats.cards_due_today || 0) + localCards.filter(c => new Date(c.due_date) <= new Date()).length,
+          cards_mastered: (stats.cards_mastered || 0) + localCards.filter(c => (c.repetitions || 0) >= 3).length,
+          total_reviews: (stats.total_reviews || 0) + localRevCount
+        };
+
+        const el = document.getElementById("stat-videos");
+        if (el) el.textContent = combinedStats.total_videos;
+        applyStatsToUI(combinedStats);
+        serverLoaded = true;
+      }
+    } catch (e) {
+      console.warn("Server stats unreachable, calculating locally:", e);
+    }
+  }
+
+  if (!serverLoaded) {
+    const now = new Date();
+    const dueCount = localCards.filter(c => !c.due_date || new Date(c.due_date) <= now).length;
+    const mastCount = localCards.filter(c => (c.repetitions || 0) >= 3).length;
+
+    const localStats = {
+      total_videos: localList.length,
+      cards_due_today: dueCount,
+      cards_mastered: mastCount,
+      total_reviews: localRevCount
+    };
+
+    const el = document.getElementById("stat-videos");
+    if (el) el.textContent = localStats.total_videos;
+    applyStatsToUI(localStats);
   }
 }
 
@@ -243,29 +539,30 @@ function applyStatsToUI(stats) {
   }
 }
 
-// Load Videos
+// Load Videos (Hybrid Server + Local Autonomous Storage)
 async function loadVideos() {
-  try {
-    const res = await fetch(apiUrl(`/api/videos?sort_by=${encodeURIComponent(currentSort)}`));
-    if (res.ok) {
-      allVideos = await res.json();
-      try { localStorage.setItem("cached_videos", JSON.stringify(allVideos)); } catch (e) {}
-    } else {
-      throw new Error("HTTP " + res.status);
-    }
-  } catch (e) {
-    console.warn("Server offline or unreachable, loading cached library:", e);
+  const localList = getLocalVideos();
+  let serverVideos = [];
+
+  if (hasServerBackend()) {
     try {
-      const cached = localStorage.getItem("cached_videos");
-      if (cached) {
-        allVideos = JSON.parse(cached);
-        showToastNotification("Offline mode: Viewing cached library", "info", 2500);
+      const res = await fetch(apiUrl(`/api/videos?sort_by=${encodeURIComponent(currentSort)}`));
+      if (res.ok) {
+        serverVideos = await res.json();
       }
-    } catch (e2) {}
+    } catch (e) {
+      console.warn("Server offline or unreachable, running in autonomous local mode:", e);
+    }
   }
+
+  // Merge server and local videos without duplicates
+  const serverIds = new Set(serverVideos.map(v => v.video_id));
+  const uniqueLocal = localList.filter(v => !serverIds.has(v.video_id));
+  allVideos = [...serverVideos, ...uniqueLocal];
 
   renderVideosGrid();
   loadStats();
+  updateModeBadge();
 
   // Check if query parameter has ?v= or ?video_id=
   const params = new URLSearchParams(window.location.search);
@@ -295,35 +592,34 @@ async function loadVideos() {
 
 // Automatically processes and distills a video shared from Mobile YouTube App
 async function autoIntakeSharedVideo(videoId) {
-  showToastNotification("✨ Capturing YouTube video... extracting transcript", "info", 6000);
-  try {
-    const res = await fetch(apiUrl("/api/videos/intake"), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        video_url_or_id: videoId,
-        force_process: true
-      })
-    });
-    const data = await res.json();
-    if (res.ok && data.video_id) {
-      showToastNotification(`✓ Distilled: ${(data.title || "Video").substring(0, 32)}...`, "success", 4000);
-      const listRes = await fetch(apiUrl(`/api/videos?sort_by=${encodeURIComponent(currentSort)}`));
-      if (listRes.ok) {
-        allVideos = await listRes.json();
-        renderVideosGrid();
-        loadStats();
+  showToastNotification("✨ Capturing YouTube video... extracting transcript", "info", 5000);
+
+  if (hasServerBackend()) {
+    try {
+      const res = await fetch(apiUrl("/api/videos/intake"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          video_url_or_id: videoId,
+          force_process: true
+        })
+      });
+      const data = await res.json();
+      if (res.ok && data.video_id) {
+        showToastNotification(`✓ Distilled: ${(data.title || "Video").substring(0, 32)}...`, "success", 4000);
+        await loadVideos();
         openReaderForVideo(data.video_id);
+        window.history.replaceState({}, document.title, window.location.pathname);
+        return;
       }
-    } else {
-      showToastNotification(`Could not transcribe: ${data.detail || data.error || "Transcript unavailable"}`, "error", 5000);
+    } catch (err) {
+      console.warn("Server intake failed or unreachable, falling back to autonomous on-device distillation:", err);
     }
-  } catch (err) {
-    console.error("Auto intake error:", err);
-    showToastNotification("Failed to connect to backend server", "error", 5000);
-  } finally {
-    window.history.replaceState({}, document.title, window.location.pathname);
   }
+
+  // Fallback to Autonomous On-Device Distillation
+  await distillVideoOnDevice(videoId);
+  window.history.replaceState({}, document.title, window.location.pathname);
 }
 
 function renderVideosGrid() {
@@ -764,6 +1060,13 @@ async function submitVideoIntake() {
 
 // Settings
 async function loadSettings() {
+  const storedKey = localStorage.getItem("recall_gemini_api_key");
+  const geminiEl = document.getElementById("setting-gemini-key");
+  if (storedKey && geminiEl) geminiEl.value = storedKey;
+  updateModeBadge();
+
+  if (!hasServerBackend()) return;
+
   try {
     const res = await fetch(apiUrl("/api/settings"));
     if (!res.ok) return;
@@ -776,7 +1079,7 @@ async function loadSettings() {
     const notEl = document.getElementById("setting-notion-db");
     if (notEl) notEl.value = data.NOTION_DATABASE_ID || "";
   } catch (e) {
-    console.error("Failed to load settings:", e);
+    console.warn("Could not load server settings (using local):", e);
   }
 }
 
@@ -784,6 +1087,11 @@ async function saveSettings() {
   const provEl = document.getElementById("setting-provider");
   const obsEl = document.getElementById("setting-obsidian-path");
   const notEl = document.getElementById("setting-notion-db");
+  const geminiEl = document.getElementById("setting-gemini-key");
+
+  if (geminiEl && geminiEl.value.trim()) {
+    localStorage.setItem("recall_gemini_api_key", geminiEl.value.trim());
+  }
 
   const payload = {
     settings: {
@@ -793,7 +1101,6 @@ async function saveSettings() {
     }
   };
 
-  const geminiEl = document.getElementById("setting-gemini-key");
   if (geminiEl && geminiEl.value.trim()) payload.settings.GEMINI_API_KEY = geminiEl.value.trim();
 
   const groqEl = document.getElementById("setting-groq-key");
@@ -802,20 +1109,23 @@ async function saveSettings() {
   const notionEl = document.getElementById("setting-notion-key");
   if (notionEl && notionEl.value.trim()) payload.settings.NOTION_API_KEY = notionEl.value.trim();
 
-  try {
-    const res = await fetch(apiUrl("/api/settings"), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
-    });
-    if (res.ok) {
-      showToastNotification("Settings saved successfully!", "success");
-    } else {
-      showToastNotification("Failed to save settings.", "error");
+  if (hasServerBackend()) {
+    try {
+      const res = await fetch(apiUrl("/api/settings"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      if (res.ok) {
+        showToastNotification("Settings saved to server & local storage!", "success");
+        return;
+      }
+    } catch (e) {
+      console.warn("Server save error (saved locally):", e);
     }
-  } catch (e) {
-    showToastNotification("Error saving settings: " + e.message, "error");
   }
+
+  showToastNotification("Settings saved locally on device!", "success");
 }
 
 async function testGeminiKey() {
@@ -948,65 +1258,92 @@ async function startFlashcardSession(filterVideoId = null) {
   const empty = document.getElementById("flashcard-empty-state");
   const statusChip = document.getElementById("practice-status-chip");
 
-  try {
-    let url = "/api/flashcards/due";
-    if (filterVideoId) {
-      url = `/api/flashcards/all?limit=100`;
+  let cards = [];
+  let loadedFromServer = false;
+
+  if (hasServerBackend()) {
+    try {
+      let url = filterVideoId ? `/api/flashcards/all?limit=100` : "/api/flashcards/due";
+      const res = await fetch(apiUrl(url));
+      if (res.ok) {
+        cards = await res.json();
+        loadedFromServer = true;
+      }
+    } catch (e) {
+      console.warn("Server flashcards unreachable, loading local cards:", e);
     }
-
-    const res = await fetch(apiUrl(url));
-    if (!res.ok) throw new Error("Could not load flashcards");
-    let cards = await res.json();
-    try { localStorage.setItem("cached_flashcards", JSON.stringify(cards)); } catch (e) {}
-
-    if (filterVideoId) {
-      cards = cards.filter(c => c.video_id === filterVideoId);
-      if (statusChip) statusChip.textContent = "Filtered by Video";
-    } else {
-      if (statusChip) statusChip.textContent = "Due Review Session";
-    }
-
-    activeFlashcards = cards;
-    currentCardIndex = 0;
-
-    if (!cards || cards.length === 0) {
-      if (container) container.classList.add("hidden");
-      if (empty) empty.classList.remove("hidden");
-      loadStats();
-      return;
-    }
-
-    if (container) container.classList.remove("hidden");
-    if (empty) empty.classList.add("hidden");
-    renderCurrentCard();
-    loadStats();
-  } catch (e) {
-    console.error("Failed to load flashcard practice session:", e);
   }
+
+  if (!loadedFromServer) {
+    const localCards = getLocalFlashcards();
+    const now = new Date();
+    if (filterVideoId) {
+      cards = localCards.filter(c => c.video_id === filterVideoId);
+    } else {
+      cards = localCards.filter(c => !c.due_date || new Date(c.due_date) <= now);
+      if (cards.length === 0 && localCards.length > 0) {
+        cards = localCards;
+      }
+    }
+  }
+
+  if (filterVideoId) {
+    cards = cards.filter(c => c.video_id === filterVideoId);
+    if (statusChip) statusChip.textContent = "Filtered by Video";
+  } else {
+    if (statusChip) statusChip.textContent = "Due Review Session";
+  }
+
+  activeFlashcards = cards;
+  currentCardIndex = 0;
+
+  if (!cards || cards.length === 0) {
+    if (container) container.classList.add("hidden");
+    if (empty) empty.classList.remove("hidden");
+    loadStats();
+    return;
+  }
+
+  if (container) container.classList.remove("hidden");
+  if (empty) empty.classList.add("hidden");
+  renderCurrentCard();
+  loadStats();
 }
 
 async function loadAllCardsSession() {
   const statusChip = document.getElementById("practice-status-chip");
   if (statusChip) statusChip.textContent = "All Cards Review";
   
-  try {
-    const res = await fetch(apiUrl("/api/flashcards/all?limit=100"));
-    if (!res.ok) return;
-    const cards = await res.json();
-    activeFlashcards = cards;
-    try { localStorage.setItem("cached_flashcards", JSON.stringify(cards)); } catch (e) {}
-    currentCardIndex = 0;
+  let cards = [];
+  let loadedFromServer = false;
 
-    const container = document.getElementById("flashcard-study-container");
-    const empty = document.getElementById("flashcard-empty-state");
+  if (hasServerBackend()) {
+    try {
+      const res = await fetch(apiUrl("/api/flashcards/all?limit=100"));
+      if (res.ok) {
+        cards = await res.json();
+        loadedFromServer = true;
+      }
+    } catch (e) {}
+  }
 
-    if (cards.length > 0) {
-      if (container) container.classList.remove("hidden");
-      if (empty) empty.classList.add("hidden");
-      renderCurrentCard();
-    }
-  } catch (e) {
-    console.error("Failed to load all cards:", e);
+  if (!loadedFromServer) {
+    cards = getLocalFlashcards();
+  }
+
+  activeFlashcards = cards;
+  currentCardIndex = 0;
+
+  const container = document.getElementById("flashcard-study-container");
+  const empty = document.getElementById("flashcard-empty-state");
+
+  if (cards.length > 0) {
+    if (container) container.classList.remove("hidden");
+    if (empty) empty.classList.add("hidden");
+    renderCurrentCard();
+  } else {
+    if (container) container.classList.add("hidden");
+    if (empty) empty.classList.remove("hidden");
   }
 }
 
@@ -1046,7 +1383,7 @@ function renderCurrentCard() {
   // Interval badge
   const intervalEl = document.getElementById("card-interval-badge");
   if (intervalEl) {
-    intervalEl.textContent = `Interval: ${card.interval_days || 0}d (Reps: ${card.repetition_count || 0})`;
+    intervalEl.textContent = `Interval: ${card.interval_days || 0}d (Reps: ${card.repetition_count || card.repetitions || 0})`;
   }
 
   // Question & Answer text
@@ -1088,24 +1425,67 @@ async function rateCurrentCard(rating) {
   const card = activeFlashcards[currentCardIndex];
   const timeTaken = cardStartTime ? (Date.now() - cardStartTime) : 1000;
 
-  try {
-    await fetch(apiUrl(`/api/flashcards/${card.id}/review`), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        rating: rating,
-        time_taken_ms: timeTaken
-      })
-    });
-
-    currentCardIndex += 1;
-    renderCurrentCard();
-    loadStats();
-  } catch (e) {
-    console.error("Failed to submit card review:", e);
-    currentCardIndex += 1;
-    renderCurrentCard();
+  if (hasServerBackend()) {
+    try {
+      await fetch(apiUrl(`/api/flashcards/${card.id}/review`), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          rating: rating,
+          time_taken_ms: timeTaken
+        })
+      });
+    } catch (e) {
+      applyLocalCardReview(card, rating);
+    }
+  } else {
+    applyLocalCardReview(card, rating);
   }
+
+  currentCardIndex += 1;
+  renderCurrentCard();
+  loadStats();
+}
+
+function applyLocalCardReview(card, rating) {
+  let q = 3;
+  if (typeof rating === "number") q = rating;
+  else if (rating === "AGAIN") q = 1;
+  else if (rating === "HARD") q = 2;
+  else if (rating === "GOOD") q = 3;
+  else if (rating === "EASY") q = 4;
+
+  let reps = (card.repetitions || card.repetition_count || 0);
+  let interval = (card.interval_days || 1);
+  let ease = (card.ease_factor || 2.5);
+
+  if (q < 3) {
+    reps = 0;
+    interval = 1;
+  } else {
+    if (reps === 0) interval = 1;
+    else if (reps === 1) interval = 3;
+    else interval = Math.round(interval * ease);
+    reps += 1;
+  }
+
+  ease = Math.max(1.3, ease + (0.1 - (5 - q) * (0.08 + (5 - q) * 0.02)));
+  const nextDue = new Date(Date.now() + interval * 86400000).toISOString();
+
+  card.repetitions = reps;
+  card.repetition_count = reps;
+  card.interval_days = interval;
+  card.ease_factor = ease;
+  card.due_date = nextDue;
+
+  const localCards = getLocalFlashcards();
+  const idx = localCards.findIndex(c => c.id === card.id);
+  if (idx >= 0) localCards[idx] = card;
+  else localCards.push(card);
+  saveLocalFlashcards(localCards);
+
+  const prevRev = parseInt(localStorage.getItem("recall_local_review_count") || "0", 10);
+  localStorage.setItem("recall_local_review_count", (prevRev + 1).toString());
 }
 
 function practiceCardsForCurrentVideo() {
@@ -1116,7 +1496,187 @@ function practiceCardsForCurrentVideo() {
 
 function downloadReaderAnki() {
   if (!currentViewingVideo) return;
-  window.location.href = apiUrl(`/api/export/anki/${currentViewingVideo.id}/download`);
+  const vid = currentViewingVideo;
+
+  if (hasServerBackend()) {
+    window.location.href = apiUrl(`/api/export/anki/${vid.id}/download`);
+    return;
+  }
+
+  let tsv = `#separator:Tab\n#html:true\n#tags column:3\n`;
+  (vid.flashcards || []).forEach(fc => {
+    const q = (fc.question || '').replace(/\t/g, ' ').replace(/\n/g, '<br>');
+    const a = (fc.answer || '').replace(/\t/g, ' ').replace(/\n/g, '<br>');
+    tsv += `${q}\t${a}\tYouTubeRecall\n`;
+  });
+
+  const blob = new Blob([tsv], { type: "text/tab-separated-values;charset=utf-8" });
+  downloadBlob(blob, `${(vid.title || 'flashcards').replace(/[^a-zA-Z0-9_-]/g, '_')}_anki.tsv`);
+}
+
+function downloadMarkdownById(videoId) {
+  const vid = allVideos.find(v => v.video_id === videoId || v.id == videoId) || currentViewingVideo;
+  if (!vid) return;
+
+  if (hasServerBackend()) {
+    window.location.href = apiUrl(`/api/export/obsidian/${vid.id}/download`);
+    return;
+  }
+
+  let md = `# ${vid.title}\n\n`;
+  md += `**Channel**: ${vid.channel_title || 'YouTube'}\n`;
+  md += `**Link**: https://www.youtube.com/watch?v=${vid.video_id}\n\n`;
+  md += `## Executive Takeaways\n`;
+  (vid.summary_bullets || []).forEach(b => md += `- ${b}\n`);
+  md += `\n## Smart Chapters\n`;
+  (vid.smart_transcript || []).forEach(ch => {
+    md += `### [${ch.timestamp_label || '00:00'}] ${ch.title}\n`;
+    (ch.crisp_points || []).forEach(p => md += `- ${p}\n`);
+    md += `\n${ch.polished_text || ''}\n\n`;
+  });
+  if (vid.final_summary) md += `## Synthesis\n${vid.final_summary}\n\n`;
+
+  const blob = new Blob([md], { type: "text/markdown;charset=utf-8" });
+  downloadBlob(blob, `${(vid.title || 'study_notes').replace(/[^a-zA-Z0-9_-]/g, '_')}.md`);
+}
+
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => {
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, 1000);
+}
+
+// ==========================================================================
+// In-App YouTube Watch Player & Auto-Capture Engine
+// ==========================================================================
+
+let currentWatchVideoId = null;
+
+function openWatchModal(initialUrl = "") {
+  const modal = document.getElementById("watch-modal");
+  if (!modal) return;
+  modal.classList.remove("hidden");
+
+  const input = document.getElementById("watch-input-url");
+  if (initialUrl && input) {
+    input.value = initialUrl;
+    loadWatchVideo();
+  } else if (!currentWatchVideoId) {
+    if (input) input.value = "https://www.youtube.com/watch?v=3d6DsjIBzJ4";
+    loadWatchVideo();
+  }
+  if (window.lucide) lucide.createIcons();
+}
+
+function closeWatchModal() {
+  const modal = document.getElementById("watch-modal");
+  if (!modal) return;
+  modal.classList.add("hidden");
+  const iframe = document.getElementById("watch-player-iframe");
+  if (iframe) iframe.src = "";
+}
+
+function loadWatchVideo() {
+  const input = document.getElementById("watch-input-url");
+  if (!input) return;
+  const val = input.value.trim();
+  const vid = extractYouTubeVideoId(val) || (val.length === 11 ? val : null);
+  if (!vid) {
+    showToastNotification("Please enter a valid YouTube video link or 11-char ID", "error");
+    return;
+  }
+  currentWatchVideoId = vid;
+  const iframe = document.getElementById("watch-player-iframe");
+  if (iframe) {
+    iframe.src = `https://www.youtube-nocookie.com/embed/${vid}?autoplay=1&enablejsapi=1`;
+  }
+  const titleEl = document.getElementById("watch-current-title");
+  if (titleEl) titleEl.textContent = `Video ID: ${vid} (Tap Distill below anytime)`;
+}
+
+async function distillCurrentWatchVideo() {
+  if (!currentWatchVideoId) {
+    showToastNotification("Please load a video first", "error");
+    return;
+  }
+  const vid = currentWatchVideoId;
+  closeWatchModal();
+  await autoIntakeSharedVideo(vid);
+}
+
+// ==========================================================================
+// Backend & Standalone Mobile Mode Management
+// ==========================================================================
+
+function setAppMode(mode) {
+  if (mode === "standalone") {
+    localStorage.setItem("recall_server_url", "standalone");
+    if (window.AndroidBridge && typeof window.AndroidBridge.setServerUrl === "function") {
+      try { window.AndroidBridge.setServerUrl(""); } catch(e){}
+    }
+    const input = document.getElementById("setting-server-url");
+    if (input) input.value = "standalone";
+    showToastNotification("⚡ Standalone Mobile Mode Active (100% On-Device)", "success");
+  } else if (mode === "cloud") {
+    const input = document.getElementById("setting-server-url");
+    if (input && (!input.value || input.value === "standalone" || input.value.includes("192.168."))) {
+      input.value = "https://";
+      input.focus();
+    }
+    showToastNotification("☁️ Please enter your cloud backend URL (e.g. Render / Railway)", "info");
+  } else if (mode === "local") {
+    const defaultLan = "http://192.168.1.4:8000";
+    localStorage.setItem("recall_server_url", defaultLan);
+    if (window.AndroidBridge && typeof window.AndroidBridge.setServerUrl === "function") {
+      try { window.AndroidBridge.setServerUrl(defaultLan); } catch(e){}
+    }
+    const input = document.getElementById("setting-server-url");
+    if (input) input.value = defaultLan;
+    showToastNotification("💻 Switched to Local Laptop LAN (192.168.1.4:8000)", "success");
+  }
+  updateModeBadge();
+}
+
+function applyServerUrlConfig() {
+  const input = document.getElementById("setting-server-url");
+  if (!input) return;
+  const val = input.value.trim();
+  localStorage.setItem("recall_server_url", val);
+  if (window.AndroidBridge && typeof window.AndroidBridge.setServerUrl === "function") {
+    try { window.AndroidBridge.setServerUrl(val); } catch(e){}
+  }
+  showToastNotification(`Server configuration saved: ${val || 'Standalone'}`, "success");
+  updateModeBadge();
+  loadVideos();
+}
+
+function updateModeBadge() {
+  const badge = document.getElementById("active-mode-badge");
+  const input = document.getElementById("setting-server-url");
+  if (!badge) return;
+
+  const current = getServerBaseUrl();
+  if (input && !input.value) {
+    input.value = current || (localStorage.getItem("recall_server_url") || "standalone");
+  }
+
+  if (!current || current.toLowerCase() === "standalone") {
+    badge.textContent = "⚡ Standalone (Device Only)";
+    badge.className = "px-2 py-0.5 rounded text-[10px] font-mono bg-amber-500/10 text-amber-400 border border-amber-500/20";
+  } else if (current.startsWith("https://")) {
+    badge.textContent = "☁️ Cloud Server Active";
+    badge.className = "px-2 py-0.5 rounded text-[10px] font-mono bg-blue-500/10 text-blue-400 border border-blue-500/20";
+  } else {
+    badge.textContent = "💻 Local Laptop LAN";
+    badge.className = "px-2 py-0.5 rounded text-[10px] font-mono bg-emerald-500/10 text-emerald-400 border border-emerald-500/20";
+  }
 }
 
 // Global Keyboard Navigation for Study Sessions

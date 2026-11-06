@@ -103,6 +103,11 @@
           <span>Settings</span>
         </button>
 
+        <button onclick="openWatchModal()" class="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium text-zinc-300 hover:text-zinc-100 hover:bg-obsidian-900 border border-obsidian-800 transition-colors">
+          <i data-lucide="tv" class="w-3.5 h-3.5 text-amber-400"></i>
+          <span>Watch &amp; Recall</span>
+        </button>
+
         <button onclick="openCaptureModal()" class="ml-2 flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold bg-amber-500 hover:bg-amber-400 text-zinc-950 transition-colors shadow-sm active:scale-95">
           <i data-lucide="plus" class="w-3.5 h-3.5 stroke-[2.5]"></i>
           <span>Add Video</span>
@@ -111,6 +116,10 @@
 
       <!-- Mobile Top Quick Actions -->
       <div class="flex sm:hidden items-center gap-2">
+        <button onclick="openWatchModal()" title="Watch YouTube &amp; Capture" class="p-2 rounded-lg bg-obsidian-900 border border-obsidian-800 text-amber-400 active:scale-95 transition-transform flex items-center gap-1 text-xs">
+          <i data-lucide="tv" class="w-4 h-4"></i>
+          <span class="text-[10px] font-bold">Watch</span>
+        </button>
         <button onclick="syncYouTubeHistoryFromUI()" title="Sync YouTube History" class="p-2 rounded-lg bg-obsidian-900 border border-obsidian-800 text-zinc-300 active:scale-95 transition-transform">
           <i data-lucide="refresh-cw" class="w-4 h-4 text-zinc-400"></i>
         </button>
@@ -582,6 +591,49 @@
           </div>
         </div>
 
+        <!-- Backend & Mobile Mode Selector -->
+        <div class="bg-obsidian-900 border border-obsidian-800 rounded-xl p-5 space-y-3">
+          <div class="flex items-center justify-between">
+            <h3 class="text-xs font-semibold uppercase tracking-wider text-zinc-300">Backend &amp; Mobile Mode</h3>
+            <span id="active-mode-badge" class="px-2 py-0.5 rounded text-[10px] font-mono bg-amber-500/10 text-amber-400 border border-amber-500/20">Checking...</span>
+          </div>
+          <p class="text-xs text-zinc-400 leading-relaxed">
+            Choose how YouTube Recall processes and syncs videos:
+          </p>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+            <button type="button" onclick="setAppMode('standalone')" id="btn-mode-standalone" class="p-3 rounded-lg border border-obsidian-800 bg-obsidian-950 text-left hover:border-amber-500/50 transition-colors">
+              <div class="font-bold text-amber-400 flex items-center gap-1.5 mb-1">
+                <i data-lucide="zap" class="w-3.5 h-3.5"></i>
+                <span>Standalone Mobile</span>
+              </div>
+              <div class="text-[11px] text-zinc-400">100% On-Device. Zero desktop or server needed.</div>
+            </button>
+            <button type="button" onclick="setAppMode('cloud')" id="btn-mode-cloud" class="p-3 rounded-lg border border-obsidian-800 bg-obsidian-950 text-left hover:border-amber-500/50 transition-colors">
+              <div class="font-bold text-zinc-200 flex items-center gap-1.5 mb-1">
+                <i data-lucide="cloud" class="w-3.5 h-3.5 text-blue-400"></i>
+                <span>Cloud Server (24/7)</span>
+              </div>
+              <div class="text-[11px] text-zinc-400">Render / Railway free cloud. Syncs phone &amp; laptop.</div>
+            </button>
+            <button type="button" onclick="setAppMode('local')" id="btn-mode-local" class="p-3 rounded-lg border border-obsidian-800 bg-obsidian-950 text-left hover:border-amber-500/50 transition-colors">
+              <div class="font-bold text-zinc-200 flex items-center gap-1.5 mb-1">
+                <i data-lucide="laptop" class="w-3.5 h-3.5 text-emerald-400"></i>
+                <span>Local Laptop LAN</span>
+              </div>
+              <div class="text-[11px] text-zinc-400">Direct WiFi to your laptop (192.168.1.4:8000).</div>
+            </button>
+          </div>
+
+          <div id="server-url-config" class="pt-2">
+            <label class="block text-xs text-zinc-400 mb-1">Active Server Endpoint</label>
+            <div class="flex gap-2">
+              <input type="text" id="setting-server-url" placeholder="https://your-app.onrender.com or http://192.168.1.4:8000" class="flex-1 bg-obsidian-950 border border-obsidian-800 rounded-md px-3 py-2 text-xs text-zinc-200 focus:outline-none font-mono">
+              <button onclick="applyServerUrlConfig()" type="button" class="px-3 py-2 rounded-md bg-amber-500 text-zinc-950 font-bold text-xs hover:bg-amber-400 transition-colors active:scale-95">Save &amp; Connect</button>
+            </div>
+            <p class="text-[11px] text-zinc-500 mt-1">Leave empty or set to "standalone" for pure 100% on-device mode.</p>
+          </div>
+        </div>
+
         <!-- Online Mobile Access -->
         <div class="bg-obsidian-900 border border-obsidian-800 rounded-xl p-5 space-y-3">
           <h3 class="text-xs font-semibold uppercase tracking-wider text-zinc-300">Online Mobile Access (Anywhere / 4G / 5G)</h3>
@@ -654,6 +706,50 @@
           <button id="intake-submit-btn" onclick="submitVideoIntake()" class="px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-zinc-950 font-semibold text-xs transition-colors shadow-sm active:scale-95">
             <span>Transcribe Video</span>
           </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- In-App Watch & Capture Modal (Watch YouTube directly on Mobile & Distill with 1 Tap) -->
+  <div id="watch-modal" onclick="if(event.target.id==='watch-modal') closeWatchModal()" class="hidden fixed inset-0 z-50 overflow-y-auto bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 modal-overlay">
+    <div class="bg-obsidian-900 border border-obsidian-800 rounded-2xl w-full max-w-2xl p-4 sm:p-6 shadow-2xl modal-content" onclick="event.stopPropagation()">
+      <div class="flex items-center justify-between pb-3 border-b border-obsidian-800 mb-3">
+        <h3 class="text-xs font-semibold uppercase tracking-wider text-zinc-200 flex items-center gap-2">
+          <i data-lucide="tv" class="w-4 h-4 text-amber-400"></i>
+          Watch YouTube &amp; Auto-Capture
+        </h3>
+        <button onclick="closeWatchModal()" class="p-1 rounded-md text-zinc-500 hover:text-zinc-200 hover:bg-obsidian-800 transition-colors">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <div class="space-y-3">
+        <!-- Input & Load row -->
+        <div class="flex gap-2">
+          <input type="text" id="watch-input-url" onkeydown="if(event.key==='Enter') loadWatchVideo()" placeholder="Paste YouTube link or video ID (e.g. 3d6DsjIBzJ4)" class="flex-1 bg-obsidian-950 border border-obsidian-800 rounded-lg px-3.5 py-2 text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none">
+          <button onclick="loadWatchVideo()" class="px-3 py-2 rounded-lg bg-obsidian-800 hover:bg-obsidian-750 text-zinc-200 text-xs font-semibold border border-obsidian-700 transition-colors">
+            Play
+          </button>
+        </div>
+
+        <!-- Embedded Video Player Frame -->
+        <div class="relative w-full aspect-video rounded-xl overflow-hidden bg-black border border-obsidian-800 shadow-inner">
+          <iframe id="watch-player-iframe" class="w-full h-full" src="" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
+        </div>
+
+        <!-- 1-Tap Distill Action -->
+        <div class="pt-1 flex flex-col sm:flex-row items-center justify-between gap-2.5">
+          <div id="watch-current-title" class="text-xs text-zinc-400 truncate max-w-xs">Ready to capture video transcript</div>
+          <div class="flex items-center gap-2 w-full sm:w-auto justify-end">
+            <button onclick="closeWatchModal()" class="px-3 py-2 rounded-lg bg-obsidian-850 hover:bg-obsidian-800 text-xs font-medium text-zinc-400 hover:text-zinc-200 transition-colors border border-obsidian-750">
+              Close
+            </button>
+            <button id="btn-distill-current-watch" onclick="distillCurrentWatchVideo()" class="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-zinc-950 font-bold text-xs transition-colors shadow-sm active:scale-95">
+              <i data-lucide="zap" class="w-3.5 h-3.5 fill-current"></i>
+              <span>Distill Into Study Guide</span>
+            </button>
+          </div>
         </div>
       </div>
     </div>
