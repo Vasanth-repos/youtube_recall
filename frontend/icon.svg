@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <rect width="512" height="512" rx="112" fill="#0c0d0f"/>
+  <rect x="24" y="24" width="464" height="464" rx="96" fill="#141518" stroke="#26272e" stroke-width="8"/>
+  <circle cx="256" cy="256" r="160" fill="#1a1b1f" stroke="#f59e0b" stroke-width="6" stroke-opacity="0.3"/>
+  <text x="256" y="325" font-family="'Newsreader', 'Georgia', serif" font-size="220" font-weight="600" fill="#f59e0b" text-anchor="middle">R</text>
+  <circle cx="360" cy="150" r="22" fill="#f59e0b"/>
+</svg>

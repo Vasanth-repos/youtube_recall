@@ -1,0 +1,19 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- Base application theme. -->
+    <style name="Theme.YouTubeRecall" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <!-- Primary brand color. -->
+        <item name="colorPrimary">@color/amber_accent</item>
+        <item name="colorPrimaryVariant">@color/amber_accent_dark</item>
+        <item name="colorOnPrimary">#000000</item>
+        <!-- Secondary brand color. -->
+        <item name="colorSecondary">@color/amber_accent</item>
+        <item name="colorSecondaryVariant">@color/amber_accent_dark</item>
+        <item name="colorOnSecondary">#000000</item>
+        <!-- Status bar color. -->
+        <item name="android:statusBarColor">@color/obsidian_canvas</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <!-- Navigation bar color -->
+        <item name="android:navigationBarColor">@color/obsidian_canvas</item>
+        <item name="android:windowBackground">@color/obsidian_canvas</item>
+    </style>
+</resources>

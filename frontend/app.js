@@ -40,6 +40,12 @@ document.addEventListener("DOMContentLoaded", () => {
   loadVideos();
   loadSettings();
   loadAccountStatus();
+  handleIncomingShareTarget();
+
+  // Register PWA Service Worker for Mobile & Offline Support
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("/sw.js").catch(() => {});
+  }
 
   // Realtime auto-refresh when tab gains focus
   window.addEventListener("focus", () => {
@@ -56,18 +62,45 @@ document.addEventListener("DOMContentLoaded", () => {
   }, 15000);
 });
 
-// Navigation Tabs
+// Handle incoming Android Web Share Target or deep link parameters
+async function handleIncomingShareTarget() {
+  const params = new URLSearchParams(window.location.search);
+  const shareUrl = params.get("url") || "";
+  const shareText = params.get("text") || "";
+  const combined = `${shareUrl} ${shareText}`.trim();
+
+  if (combined) {
+    const match = combined.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))([\w-]{11})/);
+    if (match && match[1]) {
+      const vidId = match[1];
+      openCaptureModal();
+      const inputEl = document.getElementById("intake-url");
+      if (inputEl) inputEl.value = `https://www.youtube.com/watch?v=${vidId}`;
+      const statusBox = document.getElementById("intake-status");
+      const statusText = document.getElementById("intake-status-text");
+      if (statusBox) statusBox.classList.remove("hidden");
+      if (statusText) statusText.textContent = "Shared from Android! Auto-transcribing...";
+      submitVideoIntake();
+    }
+  }
+}
+
+// Navigation Tabs (Syncs Desktop Top Nav and Mobile Bottom Nav)
 function switchTab(tab) {
   const tabs = ["library", "reader", "settings"];
   tabs.forEach(t => {
     const el = document.getElementById(`tab-${t}`);
-    const btn = document.getElementById(`nav-${t}-btn`);
+    const deskBtn = document.getElementById(`nav-${t}-btn`);
+    const mobBtn = document.getElementById(`mob-nav-${t}-btn`);
+
     if (t === tab) {
-      el.classList.remove("hidden");
-      btn.classList.add("active");
+      if (el) el.classList.remove("hidden");
+      if (deskBtn) deskBtn.classList.add("active");
+      if (mobBtn) mobBtn.classList.add("active");
     } else {
-      el.classList.add("hidden");
-      btn.classList.remove("active");
+      if (el) el.classList.add("hidden");
+      if (deskBtn) deskBtn.classList.remove("active");
+      if (mobBtn) mobBtn.classList.remove("active");
     }
   });
 
@@ -117,6 +150,8 @@ async function loadVideos() {
       currentViewingVideo = allVideos[0];
       const dot = document.getElementById("active-video-dot");
       if (dot) dot.classList.remove("hidden");
+      const mobDot = document.getElementById("mob-active-video-dot");
+      if (mobDot) mobDot.classList.remove("hidden");
     }
   } catch (e) {
     console.error("Failed to load videos:", e);
@@ -234,7 +269,10 @@ function openReaderForVideo(videoId) {
   const vid = allVideos.find(v => v.video_id === videoId || v.id == videoId);
   if (!vid) return;
   currentViewingVideo = vid;
-  document.getElementById("active-video-dot").classList.remove("hidden");
+  const dot = document.getElementById("active-video-dot");
+  if (dot) dot.classList.remove("hidden");
+  const mobDot = document.getElementById("mob-active-video-dot");
+  if (mobDot) mobDot.classList.remove("hidden");
   switchTab("reader");
   renderReaderView(vid);
 }

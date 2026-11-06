@@ -2,8 +2,19 @@
 <html lang="en" class="dark">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#0c0d0f">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="application-name" content="YouTube Recall">
   <title>YouTube Recall — Journal & Smart Transcripts</title>
+  
+  <!-- PWA Manifest & Icons -->
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" type="image/svg+xml" href="/static/icon.svg">
+  <link rel="apple-touch-icon" href="/static/icon.svg">
+
   <!-- Google Fonts: Plus Jakarta Sans (UI), Newsreader (Editorial Serif), JetBrains Mono (Code/Timestamps) -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -64,9 +75,9 @@
         </div>
       </div>
 
-      <!-- Nav Tabs -->
-      <nav class="flex items-center gap-1 sm:gap-2">
-        <div id="nav-account-status" onclick="switchTab('settings')" class="hidden sm:flex items-center gap-2 px-2.5 py-1 rounded-md bg-obsidian-900 border border-obsidian-750 text-[11px] text-zinc-400 cursor-pointer hover:border-zinc-600 transition-colors mr-1" title="Linked YouTube Account">
+      <!-- Desktop Nav Tabs (Hidden on mobile) -->
+      <nav class="hidden sm:flex items-center gap-1 sm:gap-2">
+        <div id="nav-account-status" onclick="switchTab('settings')" class="flex items-center gap-2 px-2.5 py-1 rounded-md bg-obsidian-900 border border-obsidian-750 text-[11px] text-zinc-400 cursor-pointer hover:border-zinc-600 transition-colors mr-1" title="Linked YouTube Account">
           <span id="nav-account-dot" class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
           <span id="nav-account-name" class="font-mono text-zinc-300">YouTube Linked</span>
         </div>
@@ -90,11 +101,22 @@
           <span>Add Video</span>
         </button>
       </nav>
+
+      <!-- Mobile Top Quick Actions -->
+      <div class="flex sm:hidden items-center gap-2">
+        <button onclick="syncYouTubeHistoryFromUI()" title="Sync YouTube History" class="p-2 rounded-lg bg-obsidian-900 border border-obsidian-800 text-zinc-300 active:scale-95 transition-transform">
+          <i data-lucide="refresh-cw" class="w-4 h-4 text-zinc-400"></i>
+        </button>
+        <button onclick="openCaptureModal()" title="Add Video" class="px-2.5 py-1.5 rounded-lg bg-amber-500 text-zinc-950 font-bold text-xs flex items-center gap-1 shadow-sm active:scale-95 transition-transform">
+          <i data-lucide="plus" class="w-3.5 h-3.5 stroke-[3]"></i>
+          <span>Add</span>
+        </button>
+      </div>
     </div>
   </header>
 
   <!-- Main Content Area -->
-  <main class="flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 py-6 sm:py-8">
+  <main class="flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 py-5 sm:py-8 pb-28 sm:pb-12">
 
     <!-- TAB 1: Library View -->
     <div id="tab-library" class="space-y-6">
@@ -310,6 +332,54 @@
           </p>
         </div>
 
+        <!-- Android Application & Mobile Access Card -->
+        <div class="bg-obsidian-900 border border-obsidian-800 rounded-xl p-5 space-y-4">
+          <div class="flex items-center justify-between">
+            <h3 class="text-xs font-semibold uppercase tracking-wider text-zinc-300 flex items-center gap-2">
+              <i data-lucide="smartphone" class="w-4 h-4 text-amber-400"></i>
+              Android Application & Mobile Access
+            </h3>
+            <span class="px-2.5 py-0.5 rounded-full text-[10px] font-mono bg-amber-500/10 text-amber-400 border border-amber-500/20">
+              Mobile Ready
+            </span>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <!-- Native APK Download -->
+            <div class="p-3.5 rounded-lg bg-obsidian-950 border border-obsidian-800 flex flex-col justify-between space-y-2.5">
+              <div>
+                <div class="text-xs font-semibold text-zinc-100 flex items-center gap-1.5 mb-1">
+                  <i data-lucide="download" class="w-3.5 h-3.5 text-amber-400"></i>
+                  Native Android App (APK)
+                </div>
+                <p class="text-[11px] text-zinc-400 leading-snug">
+                  Install the official Android app. Integrates directly into Android's <strong>YouTube Share Sheet</strong>: tap "Share" on any video to auto-transcribe!
+                </p>
+              </div>
+              <a href="/api/download/android-apk" download="youtube-recall.apk" class="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md bg-amber-500 hover:bg-amber-400 text-zinc-950 font-semibold text-xs transition-colors shadow-sm w-full">
+                <i data-lucide="download" class="w-3.5 h-3.5 stroke-[2.5]"></i>
+                <span>Download APK (v1.0.0)</span>
+              </a>
+            </div>
+
+            <!-- Mobile PWA & LAN URL -->
+            <div class="p-3.5 rounded-lg bg-obsidian-950 border border-obsidian-800 flex flex-col justify-between space-y-2.5">
+              <div>
+                <div class="text-xs font-semibold text-zinc-100 flex items-center gap-1.5 mb-1">
+                  <i data-lucide="wifi" class="w-3.5 h-3.5 text-emerald-400"></i>
+                  Local Wi-Fi Mobile Access
+                </div>
+                <p class="text-[11px] text-zinc-400 leading-snug">
+                  Open this link on your phone browser (Chrome) while on the same Wi-Fi. Tap <strong>"Add to Home screen"</strong> for instant PWA installation:
+                </p>
+                <div class="mt-1.5 p-1.5 rounded bg-obsidian-900 border border-obsidian-750 font-mono text-[11px] text-amber-400 select-all">
+                  http://192.168.1.4:8000
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- AI Engine Selection -->
         <div class="bg-obsidian-900 border border-obsidian-800 rounded-xl p-5 space-y-3">
           <h3 class="text-xs font-semibold uppercase tracking-wider text-zinc-300">AI Distillation Engine</h3>
@@ -392,7 +462,41 @@
     </div>
   </div>
 
-  <footer class="border-t border-obsidian-850 bg-obsidian-950 py-5 text-center text-xs text-zinc-600">
+  <!-- Native Mobile Bottom Navigation Bar (Android & iOS Ergonomic Bottom Nav) -->
+  <nav class="sm:hidden fixed bottom-0 left-0 right-0 z-50 bg-obsidian-950/95 backdrop-blur-lg border-t border-obsidian-800/90 px-3 pt-1.5 pb-[max(0.6rem,env(safe-area-inset-bottom))] shadow-2xl">
+    <div class="grid grid-cols-4 items-center gap-1">
+      
+      <!-- Tab 1: Library -->
+      <button id="mob-nav-library-btn" onclick="switchTab('library')" class="mob-nav-tab active flex flex-col items-center justify-center py-1 text-zinc-400 hover:text-zinc-200 transition-colors">
+        <i data-lucide="layout-grid" class="w-5 h-5 mb-1"></i>
+        <span class="text-[10px] font-medium tracking-tight">Library</span>
+      </button>
+
+      <!-- Tab 2: Reader -->
+      <button id="mob-nav-reader-btn" onclick="switchTab('reader')" class="mob-nav-tab flex flex-col items-center justify-center py-1 text-zinc-400 hover:text-zinc-200 transition-colors relative">
+        <i data-lucide="book-open" class="w-5 h-5 mb-1"></i>
+        <span class="text-[10px] font-medium tracking-tight">Reader</span>
+        <span id="mob-active-video-dot" class="hidden absolute top-1 right-1/4 w-2 h-2 rounded-full bg-amber-400 ring-2 ring-obsidian-950"></span>
+      </button>
+
+      <!-- Tab 3: Quick Add / Capture -->
+      <button id="mob-nav-add-btn" onclick="openCaptureModal()" class="flex flex-col items-center justify-center py-0.5 text-amber-400 active:scale-95 transition-transform">
+        <div class="w-10 h-10 rounded-full bg-amber-500 hover:bg-amber-400 text-zinc-950 flex items-center justify-center shadow-lg shadow-amber-500/25 mb-0.5">
+          <i data-lucide="plus" class="w-5 h-5 stroke-[2.5]"></i>
+        </div>
+        <span class="text-[10px] font-semibold text-zinc-300">Add</span>
+      </button>
+
+      <!-- Tab 4: Settings -->
+      <button id="mob-nav-settings-btn" onclick="switchTab('settings')" class="mob-nav-tab flex flex-col items-center justify-center py-1 text-zinc-400 hover:text-zinc-200 transition-colors">
+        <i data-lucide="sliders" class="w-5 h-5 mb-1"></i>
+        <span class="text-[10px] font-medium tracking-tight">Settings</span>
+      </button>
+
+    </div>
+  </nav>
+
+  <footer class="border-t border-obsidian-850 bg-obsidian-950 py-5 text-center text-xs text-zinc-600 pb-16 sm:pb-5">
     <p>YouTube Recall • Human-Crafted AI Knowledge Engine</p>
   </footer>
 

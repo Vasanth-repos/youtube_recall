@@ -62,3 +62,28 @@ if FRONTEND_DIR.exists():
             return FileResponse(index_file)
         return {"message": "Frontend index.html not found"}
 
+    @app.get("/manifest.webmanifest")
+    def serve_manifest():
+        manifest_file = FRONTEND_DIR / "manifest.webmanifest"
+        if manifest_file.exists():
+            return FileResponse(manifest_file, media_type="application/manifest+json")
+        return {"error": "Manifest not found"}
+
+    @app.get("/sw.js")
+    def serve_service_worker():
+        sw_file = FRONTEND_DIR / "sw.js"
+        if sw_file.exists():
+            return FileResponse(sw_file, media_type="application/javascript")
+        return {"error": "Service worker not found"}
+
+    @app.get("/api/download/android-apk")
+    def download_android_apk():
+        apk_path = Path(__file__).resolve().parent.parent.parent / "android" / "youtube-recall.apk"
+        if apk_path.exists():
+            return FileResponse(
+                apk_path,
+                filename="youtube-recall.apk",
+                media_type="application/vnd.android.package-archive"
+            )
+        return {"error": "APK not found. Please build using gradle."}
+

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="obsidian_canvas">#0C0D0F</color>
+    <color name="obsidian_surface">#141518</color>
+    <color name="obsidian_card">#1A1B1F</color>
+    <color name="obsidian_border">#26272E</color>
+    <color name="amber_accent">#F59E0B</color>
+    <color name="amber_accent_dark">#D97706</color>
+    <color name="zinc_primary">#F4F4F6</color>
+    <color name="zinc_muted">#6B6E79</color>
+</resources>

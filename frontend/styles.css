@@ -99,6 +99,32 @@ body {
   background: #333640;
 }
 
+/* Mobile Ergonomics & Native Bottom Nav */
+.mob-nav-tab {
+  color: var(--text-muted);
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  transition: all 0.15s ease;
+}
+
+.mob-nav-tab.active {
+  color: var(--accent-amber);
+}
+
+.mob-nav-tab.active i {
+  color: var(--accent-amber);
+  stroke-width: 2.25;
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+html {
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+}
+
 /* Card Transitions */
 .editorial-card {
   transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.15s ease;
