@@ -172,6 +172,35 @@ def get_video(id_or_video_id: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Video not found.")
     return vid
 
+@router.post("/{video_id}/redistill", response_model=VideoResponse)
+def redistill_video_transcript(video_id: int, db: Session = Depends(get_db)):
+    """Re-distills video transcript with clean AI distillation engine."""
+    vid = db.query(Video).filter(Video.id == video_id).first()
+    if not vid:
+        raise HTTPException(status_code=404, detail="Video not found.")
+
+    # Fetch fresh transcript and chunking
+    clean_transcript, segments = YouTubeService.get_transcript(vid.video_id)
+    chunks = YouTubeService.chunk_transcript_by_time(segments, chunk_seconds=180)
+
+    recall_data = AIService.generate_recall_assets(
+        title=vid.title,
+        channel=vid.channel_title,
+        duration_seconds=vid.duration_seconds,
+        transcript_text=clean_transcript or vid.transcript_clean,
+        chunks=chunks
+    )
+
+    vid.summary_bullets = recall_data.get("summary_bullets", [])
+    vid.key_concepts = recall_data.get("key_concepts", [])
+    vid.topic_notes = recall_data.get("topic_notes", [])
+    vid.smart_transcript = recall_data.get("smart_transcript", [])
+    vid.final_summary = recall_data.get("final_summary", "")
+
+    db.commit()
+    db.refresh(vid)
+    return vid
+
 @router.delete("/{video_id}")
 def delete_video(video_id: int, db: Session = Depends(get_db)):
     """Deletes a video and all associated flashcards from the system."""

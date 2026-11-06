@@ -375,6 +375,27 @@ function downloadReaderMarkdown() {
   downloadMarkdownById(currentViewingVideo.id);
 }
 
+async function redistillCurrentVideo() {
+  if (!currentViewingVideo) return;
+  const btnText = document.getElementById("redistill-btn-text");
+  const original = btnText.textContent;
+  btnText.textContent = "⏳ Distilling...";
+
+  try {
+    const res = await fetch(`/api/videos/${currentViewingVideo.id}/redistill`, { method: "POST" });
+    if (!res.ok) throw new Error("Failed to re-distill transcript");
+    const data = await res.json();
+    currentViewingVideo = data;
+    renderReaderView(data);
+    loadStats();
+    btnText.textContent = "✓ Transcript Refined!";
+    setTimeout(() => btnText.textContent = original, 2500);
+  } catch (e) {
+    alert("Re-distillation notice: " + e.message);
+    btnText.textContent = original;
+  }
+}
+
 function downloadMarkdownById(videoId) {
   window.location.href = `/api/export/obsidian/${videoId}/download`;
 }
