@@ -1,0 +1,7 @@
+venv/
+__pycache__/
+*.pyc
+recall.db
+exports/
+.env
+.DS_Store

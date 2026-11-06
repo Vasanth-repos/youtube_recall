@@ -1,0 +1,26 @@
+{
+  "manifest_version": 3,
+  "name": "YouTube Recall - AI Micro-Learning Capture",
+  "version": "1.0.0",
+  "description": "Capture YouTube videos, generate AI flashcards, and revise with spaced repetition (100% Free).",
+  "permissions": [
+    "storage",
+    "activeTab"
+  ],
+  "host_permissions": [
+    "https://www.youtube.com/*",
+    "http://localhost:8000/*"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "YouTube Recall"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://www.youtube.com/watch*"],
+      "js": ["content.js"],
+      "css": ["content.css"],
+      "run_at": "document_idle"
+    }
+  ]
+}
