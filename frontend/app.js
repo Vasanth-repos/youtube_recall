@@ -240,6 +240,11 @@ async function loadVideos() {
       const match = allVideos.find(v => v.video_id === targetV || String(v.id) === targetV);
       if (match) {
         openReaderForVideo(match.video_id);
+        window.history.replaceState({}, document.title, window.location.pathname);
+        return;
+      } else {
+        // Shared from mobile YouTube App or new link: auto-intake & distill!
+        await autoIntakeSharedVideo(targetV);
         return;
       }
     }
@@ -254,6 +259,39 @@ async function loadVideos() {
     }
   } catch (e) {
     console.error("Failed to load videos:", e);
+  }
+}
+
+// Automatically processes and distills a video shared from Mobile YouTube App
+async function autoIntakeSharedVideo(videoId) {
+  showToastNotification("✨ Capturing YouTube video... extracting transcript", "info", 6000);
+  try {
+    const res = await fetch("/api/videos/intake", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        video_url_or_id: videoId,
+        force_process: true
+      })
+    });
+    const data = await res.json();
+    if (res.ok && data.video_id) {
+      showToastNotification(`✓ Distilled: ${(data.title || "Video").substring(0, 32)}...`, "success", 4000);
+      const listRes = await fetch(`/api/videos?sort_by=${encodeURIComponent(currentSort)}`);
+      if (listRes.ok) {
+        allVideos = await listRes.json();
+        renderVideosGrid();
+        loadStats();
+        openReaderForVideo(data.video_id);
+      }
+    } else {
+      showToastNotification(`Could not transcribe: ${data.detail || data.error || "Transcript unavailable"}`, "error", 5000);
+    }
+  } catch (err) {
+    console.error("Auto intake error:", err);
+    showToastNotification("Failed to connect to backend server", "error", 5000);
+  } finally {
+    window.history.replaceState({}, document.title, window.location.pathname);
   }
 }
 
