@@ -77,6 +77,7 @@ if FRONTEND_DIR.exists():
         return {"error": "Service worker not found"}
 
     @app.get("/api/download/android-apk")
+    @app.head("/api/download/android-apk")
     def download_android_apk():
         apk_path = Path(__file__).resolve().parent.parent.parent / "android" / "youtube-recall.apk"
         if apk_path.exists():

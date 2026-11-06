@@ -425,7 +425,16 @@ function renderReaderView(video) {
   renderTranscriptSections(sections, video.video_id);
 
   // Synthesis
-  document.getElementById("reader-synthesis").textContent = video.final_summary || "Synthesis not available.";
+  const synthesisContainer = document.getElementById("reader-synthesis-container");
+  const synthesisEl = document.getElementById("reader-synthesis");
+  if (synthesisEl) {
+    if (video.final_summary) {
+      synthesisEl.textContent = video.final_summary;
+      if (synthesisContainer) synthesisContainer.classList.remove("hidden");
+    } else {
+      synthesisEl.textContent = "Synthesis not available.";
+    }
+  }
 
   if (window.lucide) lucide.createIcons();
 }
@@ -435,7 +444,7 @@ function renderTranscriptSections(sections, videoId) {
   
   if (!sections || sections.length === 0) {
     container.innerHTML = `
-      <div class="bg-obsidian-900 border border-obsidian-800 rounded-xl p-6 text-center text-zinc-400 text-xs font-mono">
+      <div class="p-6 text-center text-zinc-500 text-xs font-mono">
         No chapter breakdown available for this video.
       </div>
     `;
@@ -451,10 +460,10 @@ function renderTranscriptSections(sections, videoId) {
     const polishedText = sec.polished_text || sec.summary || "";
 
     return `
-      <div class="transcript-section-card bg-obsidian-900/80 border border-obsidian-800 rounded-xl p-5 shadow-sm space-y-3.5 transition-colors hover:border-obsidian-700" data-text="${(title + ' ' + crispPoints.join(' ') + ' ' + polishedText).toLowerCase()}">
+      <div class="transcript-section-card p-5 sm:p-6 space-y-3.5 hover:bg-obsidian-850/30 transition-colors" data-text="${(title + ' ' + crispPoints.join(' ') + ' ' + polishedText).toLowerCase()}">
         
         <!-- Header: Timestamp + Title -->
-        <div class="flex items-center gap-3 pb-2.5 border-b border-obsidian-800/80">
+        <div class="flex items-center gap-3 pb-2.5 border-b border-obsidian-800/60">
           <a href="${jumpUrl}" target="_blank" title="Jump to ${tsLabel} on YouTube" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 font-mono text-xs font-medium border border-amber-500/20 transition-colors">
             <i data-lucide="play" class="w-3 h-3 fill-amber-400"></i>
             <span>${tsLabel}</span>
@@ -476,7 +485,7 @@ function renderTranscriptSections(sections, videoId) {
 
         <!-- Polished Reading Paragraph -->
         ${polishedText ? `
-          <p class="text-sm text-zinc-400 font-serif leading-relaxed pt-3 border-t border-obsidian-800/60">
+          <p class="text-xs sm:text-sm text-zinc-400 font-serif leading-relaxed pt-3 border-t border-obsidian-800/60">
             ${polishedText}
           </p>
         ` : ''}
