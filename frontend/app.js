@@ -328,7 +328,7 @@ function renderVideosGrid() {
         </div>
 
         <!-- Card Footer -->
-        <div class="p-3.5 pt-0 border-t border-obsidian-800/80 mt-2 flex items-center justify-between text-xs text-zinc-400">
+        <div class="px-4 py-3 border-t border-obsidian-800/80 mt-auto flex items-center justify-between text-xs text-zinc-400">
           <span class="text-[11px] text-zinc-500 font-mono">${sections.length} chapters</span>
           <div class="flex items-center gap-1.5">
             <button onclick="openReaderForVideo('${v.video_id}')" title="Read Transcript" class="px-2.5 py-1 rounded-md bg-obsidian-800 hover:bg-obsidian-750 text-amber-400 text-xs font-medium flex items-center gap-1.5 transition-colors border border-obsidian-700">
@@ -399,8 +399,8 @@ function renderReaderView(video) {
   // Executive Takeaways
   const bulletsEl = document.getElementById("reader-bullets");
   bulletsEl.innerHTML = (video.summary_bullets || []).map(b => `
-    <li class="flex items-start gap-3">
-      <span class="text-amber-400 font-serif font-bold text-base leading-none mt-0.5 select-none">—</span>
+    <li class="flex items-start gap-2.5">
+      <span class="text-amber-400 font-bold text-sm leading-snug select-none flex-shrink-0 mt-0.5">•</span>
       <span class="font-normal text-zinc-200 leading-relaxed text-sm sm:text-base">${b}</span>
     </li>
   `).join("");
@@ -464,11 +464,11 @@ function renderTranscriptSections(sections, videoId) {
         
         <!-- Header: Timestamp + Title -->
         <div class="flex items-center gap-3 pb-2.5 border-b border-obsidian-800/60">
-          <a href="${jumpUrl}" target="_blank" title="Jump to ${tsLabel} on YouTube" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 font-mono text-xs font-medium border border-amber-500/20 transition-colors">
+          <a href="${jumpUrl}" target="_blank" title="Jump to ${tsLabel} on YouTube" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 font-mono text-xs font-medium border border-amber-500/20 transition-colors flex-shrink-0">
             <i data-lucide="play" class="w-3 h-3 fill-amber-400"></i>
             <span>${tsLabel}</span>
           </a>
-          <h3 class="font-serif font-medium text-zinc-100 text-base sm:text-lg tracking-tight">${title}</h3>
+          <h3 class="font-serif font-medium text-zinc-100 text-base sm:text-lg tracking-tight leading-snug">${title}</h3>
         </div>
 
         <!-- Crisp Bullet Points -->

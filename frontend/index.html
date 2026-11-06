@@ -154,19 +154,21 @@
       <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-1">
         <!-- Search Input -->
         <div class="relative flex-1 max-w-md">
-          <i data-lucide="search" class="w-4 h-4 absolute left-3 top-2.5 text-zinc-500"></i>
+          <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-zinc-500">
+            <i data-lucide="search" class="w-4 h-4"></i>
+          </div>
           <input type="text" id="search-input" onkeyup="handleSearch()" placeholder="Search notes or transcripts..." class="w-full bg-obsidian-900 border border-obsidian-750 rounded-lg pl-9 pr-4 py-2 text-xs sm:text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none transition-colors">
         </div>
 
         <!-- Filter Pills & Sorter -->
-        <div class="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0 text-xs scrollbar-none">
-          <button onclick="filterCategory('')" class="category-pill active px-3 py-1.5 rounded-md text-zinc-300 border border-obsidian-750 bg-obsidian-900 transition-colors">All</button>
-          <button onclick="filterCategory('Tech')" class="category-pill px-3 py-1.5 rounded-md text-zinc-400 border border-obsidian-750 bg-obsidian-900 transition-colors">Tech</button>
-          <button onclick="filterCategory('Science')" class="category-pill px-3 py-1.5 rounded-md text-zinc-400 border border-obsidian-750 bg-obsidian-900 transition-colors">Science</button>
-          <button onclick="filterCategory('Growth')" class="category-pill px-3 py-1.5 rounded-md text-zinc-400 border border-obsidian-750 bg-obsidian-900 transition-colors">Productivity</button>
+        <div class="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0 text-xs scrollbar-none flex-nowrap">
+          <button onclick="filterCategory('')" class="category-pill active whitespace-nowrap px-3 py-1.5 rounded-md text-zinc-300 border border-obsidian-750 bg-obsidian-900 transition-colors flex-shrink-0">All</button>
+          <button onclick="filterCategory('Tech')" class="category-pill whitespace-nowrap px-3 py-1.5 rounded-md text-zinc-400 border border-obsidian-750 bg-obsidian-900 transition-colors flex-shrink-0">Tech</button>
+          <button onclick="filterCategory('Science')" class="category-pill whitespace-nowrap px-3 py-1.5 rounded-md text-zinc-400 border border-obsidian-750 bg-obsidian-900 transition-colors flex-shrink-0">Science</button>
+          <button onclick="filterCategory('Growth')" class="category-pill whitespace-nowrap px-3 py-1.5 rounded-md text-zinc-400 border border-obsidian-750 bg-obsidian-900 transition-colors flex-shrink-0">Productivity</button>
 
           <!-- Sort Select -->
-          <div class="flex items-center gap-1.5 bg-obsidian-900 border border-obsidian-750 rounded-md px-2.5 py-1.5 text-xs text-zinc-400">
+          <div class="flex items-center gap-1.5 bg-obsidian-900 border border-obsidian-750 rounded-md px-2.5 py-1.5 text-xs text-zinc-400 flex-shrink-0">
             <span class="text-zinc-500 font-medium">Sort:</span>
             <select id="sort-select" onchange="handleSortChange()" class="bg-transparent text-zinc-200 font-medium focus:outline-none cursor-pointer">
               <option value="recently_watched" class="bg-obsidian-900 text-zinc-200" selected>Recently Watched</option>
@@ -177,7 +179,7 @@
           </div>
 
           <!-- Sync History Button -->
-          <button onclick="syncYouTubeHistoryFromUI()" id="sync-history-ui-btn" title="Sync recent videos from your linked YouTube session" class="px-2.5 py-1.5 rounded-md bg-obsidian-900 hover:bg-obsidian-850 text-zinc-300 border border-obsidian-750 hover:border-zinc-600 font-medium whitespace-nowrap flex items-center gap-1.5 transition-colors">
+          <button onclick="syncYouTubeHistoryFromUI()" id="sync-history-ui-btn" title="Sync recent videos from your linked YouTube session" class="px-2.5 py-1.5 rounded-md bg-obsidian-900 hover:bg-obsidian-850 text-zinc-300 border border-obsidian-750 hover:border-zinc-600 font-medium whitespace-nowrap flex items-center gap-1.5 transition-colors flex-shrink-0">
             <i data-lucide="refresh-cw" class="w-3.5 h-3.5 text-zinc-400"></i>
             <span id="sync-history-ui-text">Sync</span>
           </button>
@@ -253,12 +255,8 @@
                 <i data-lucide="external-link" class="w-3.5 h-3.5 text-red-400"></i>
                 <span>YouTube</span>
               </a>
-            </div>
-
-            <!-- Secondary Actions -->
-            <div class="flex items-center gap-2">
-              <button onclick="redistillCurrentVideo()" title="Clean and re-distill transcript" class="px-2.5 py-1.5 rounded-md bg-obsidian-850 hover:bg-obsidian-800 text-xs text-zinc-400 hover:text-amber-400 flex items-center gap-1 transition-colors border border-obsidian-750 active:scale-95">
-                <i data-lucide="refresh-cw" class="w-3 h-3"></i>
+              <button onclick="redistillCurrentVideo()" title="Clean and re-distill transcript" class="px-2.5 py-1.5 rounded-md bg-obsidian-850 hover:bg-obsidian-800 text-xs text-zinc-400 hover:text-amber-400 flex items-center gap-1.5 transition-colors border border-obsidian-750 active:scale-95">
+                <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
                 <span id="redistill-btn-text">Re-distill</span>
               </button>
             </div>
@@ -266,7 +264,9 @@
 
           <!-- In-Transcript Realtime Filter -->
           <div class="relative pt-1">
-            <i data-lucide="search" class="w-3.5 h-3.5 absolute left-3 top-3 text-zinc-500"></i>
+            <div class="absolute inset-y-0 left-0 pt-1 pl-3 flex items-center pointer-events-none text-zinc-500">
+              <i data-lucide="search" class="w-3.5 h-3.5"></i>
+            </div>
             <input type="text" id="transcript-filter" onkeyup="filterTranscriptSections()" placeholder="Search within chapters..." class="w-full bg-obsidian-950 border border-obsidian-800 rounded-md pl-9 pr-3 py-1.5 text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none transition-colors">
           </div>
         </div>
@@ -342,9 +342,9 @@
       <!-- Top Practice Header & Stats -->
       <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-obsidian-900 border border-obsidian-800 rounded-xl p-5 shadow-sm">
         <div>
-          <h2 class="font-serif text-xl sm:text-2xl font-medium text-zinc-100 flex items-center gap-2">
+          <h2 class="font-serif text-xl sm:text-2xl font-medium text-zinc-100 flex flex-wrap items-center gap-2">
             <span>Spaced Repetition Practice</span>
-            <span id="practice-status-chip" class="text-[11px] font-mono px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">Active Session</span>
+            <span id="practice-status-chip" class="text-[11px] font-mono px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 whitespace-nowrap">Active Session</span>
           </h2>
           <p class="text-xs text-zinc-400 mt-1">
             Strengthen memory retention using the SM-2 active recall forgetting curve.
@@ -352,16 +352,16 @@
         </div>
 
         <!-- Metrics Counters -->
-        <div class="flex items-center gap-2.5">
-          <div class="px-3.5 py-2 rounded-lg bg-obsidian-950 border border-obsidian-800 text-center min-w-[70px]">
+        <div class="grid grid-cols-3 sm:flex items-center gap-2 sm:gap-2.5 w-full sm:w-auto">
+          <div class="px-3 py-2 rounded-lg bg-obsidian-950 border border-obsidian-800 text-center sm:min-w-[70px]">
             <div id="metric-due-count" class="font-mono text-base font-bold text-amber-400">0</div>
             <div class="text-[9px] text-zinc-500 uppercase tracking-wider font-semibold">Due Now</div>
           </div>
-          <div class="px-3.5 py-2 rounded-lg bg-obsidian-950 border border-obsidian-800 text-center min-w-[70px]">
+          <div class="px-3 py-2 rounded-lg bg-obsidian-950 border border-obsidian-800 text-center sm:min-w-[70px]">
             <div id="metric-mastered-count" class="font-mono text-base font-bold text-emerald-400">0</div>
             <div class="text-[9px] text-zinc-500 uppercase tracking-wider font-semibold">Mastered</div>
           </div>
-          <div class="px-3.5 py-2 rounded-lg bg-obsidian-950 border border-obsidian-800 text-center min-w-[70px]">
+          <div class="px-3 py-2 rounded-lg bg-obsidian-950 border border-obsidian-800 text-center sm:min-w-[70px]">
             <div id="metric-reviews-count" class="font-mono text-base font-bold text-zinc-300">0</div>
             <div class="text-[9px] text-zinc-500 uppercase tracking-wider font-semibold">Reviewed</div>
           </div>
