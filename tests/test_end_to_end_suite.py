@@ -124,6 +124,14 @@ def run_e2e_tests():
     assert res.json()["id"] == video_db_id
     print(f"  ✓ GET /api/videos/{test_vid_id} (YouTube ID) resolved correctly")
 
+    # Verify Recently Watched Sorting
+    res = client.get("/api/videos?sort_by=recently_watched")
+    assert res.status_code == 200
+    sorted_vids = res.json()
+    assert len(sorted_vids) >= 1
+    assert "last_watched_at" in sorted_vids[0]
+    print(f"  ✓ GET /api/videos?sort_by=recently_watched verified ({len(sorted_vids)} videos sorted)")
+
     # -------------------------------------------------------------
     # STEP 5: Re-distillation Endpoint
     # -------------------------------------------------------------

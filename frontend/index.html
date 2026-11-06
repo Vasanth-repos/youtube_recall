@@ -97,6 +97,16 @@
           <button onclick="filterCategory('Tech')" class="category-pill px-3 py-1.5 rounded-lg font-medium whitespace-nowrap bg-dark-850 text-slate-300 border border-dark-700/70 hover:border-slate-500 transition-colors">Tech & Coding</button>
           <button onclick="filterCategory('Science')" class="category-pill px-3 py-1.5 rounded-lg font-medium whitespace-nowrap bg-dark-850 text-slate-300 border border-dark-700/70 hover:border-slate-500 transition-colors">Science & Math</button>
           <button onclick="filterCategory('Growth')" class="category-pill px-3 py-1.5 rounded-lg font-medium whitespace-nowrap bg-dark-850 text-slate-300 border border-dark-700/70 hover:border-slate-500 transition-colors">Productivity</button>
+          <div class="flex items-center gap-1.5 bg-dark-850 border border-dark-700/70 rounded-lg px-2.5 py-1.5 text-xs text-slate-300">
+            <i data-lucide="arrow-down-up" class="w-3.5 h-3.5 text-brand-400"></i>
+            <span class="text-slate-400 font-medium">Sort:</span>
+            <select id="sort-select" onchange="handleSortChange()" class="bg-transparent text-white font-medium focus:outline-none cursor-pointer">
+              <option value="recently_watched" class="bg-dark-900 text-white" selected>Recently Watched</option>
+              <option value="newest" class="bg-dark-900 text-white">Date Added</option>
+              <option value="duration" class="bg-dark-900 text-white">Duration</option>
+              <option value="title" class="bg-dark-900 text-white">Title (A-Z)</option>
+            </select>
+          </div>
           <button onclick="syncYouTubeHistoryFromUI()" id="sync-history-ui-btn" title="Sync recent videos from your linked YouTube session" class="ml-1 px-3 py-1.5 rounded-lg bg-dark-850 hover:bg-dark-800 text-brand-400 border border-brand-500/30 hover:border-brand-500/60 font-semibold whitespace-nowrap flex items-center gap-1.5 transition-colors">
             <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
             <span id="sync-history-ui-text">Sync History</span>

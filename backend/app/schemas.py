@@ -8,6 +8,7 @@ class VideoIntakeRequest(BaseModel):
     duration_seconds: Optional[int] = Field(0, description="Total video duration in seconds")
     watch_percent: Optional[float] = Field(0.0, description="Percentage watched (0 - 100)")
     force_process: bool = Field(False, description="Bypass watch-time & entertainment filters")
+    watched_at: Optional[Union[datetime, str]] = None
 
 class TopicNote(BaseModel):
     timestamp_seconds: int
@@ -62,6 +63,7 @@ class VideoResponse(BaseModel):
     flashcards: List[FlashcardResponse] = []
     created_at: datetime
     updated_at: datetime
+    last_watched_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True

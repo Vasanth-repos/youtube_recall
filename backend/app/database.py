@@ -39,3 +39,10 @@ def init_db():
     except Exception:
         pass # column already exists
 
+    try:
+        with engine.connect() as conn:
+            conn.execute(__import__("sqlalchemy").text("ALTER TABLE videos ADD COLUMN last_watched_at DATETIME"))
+            conn.commit()
+    except Exception:
+        pass
+

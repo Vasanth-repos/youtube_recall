@@ -3,6 +3,36 @@
 let allVideos = [];
 let currentViewingVideo = null;
 let activeCategory = "";
+let currentSort = "recently_watched";
+
+function formatRelativeTime(dateString) {
+  if (!dateString) return "Recently";
+  try {
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return "Recently";
+    const now = new Date();
+    const diffSec = Math.floor((now - date) / 1000);
+    if (diffSec < 60) return "Just now";
+    const diffMin = Math.floor(diffSec / 60);
+    if (diffMin < 60) return `${diffMin}m ago`;
+    const diffHr = Math.floor(diffMin / 60);
+    if (diffHr < 24) return `${diffHr}h ago`;
+    const diffDays = Math.floor(diffHr / 24);
+    if (diffDays === 1) return "Yesterday";
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  } catch (e) {
+    return "Recently";
+  }
+}
+
+function handleSortChange() {
+  const el = document.getElementById("sort-select");
+  if (el) {
+    currentSort = el.value;
+  }
+  loadVideos();
+}
 
 document.addEventListener("DOMContentLoaded", () => {
   if (window.lucide) lucide.createIcons();
@@ -51,7 +81,7 @@ async function loadStats() {
 // Load Videos
 async function loadVideos() {
   try {
-    const res = await fetch("/api/videos");
+    const res = await fetch(`/api/videos?sort_by=${encodeURIComponent(currentSort)}`);
     if (!res.ok) return;
     allVideos = await res.json();
     renderVideosGrid();
@@ -71,7 +101,8 @@ async function loadVideos() {
     // Auto-select first video into Reader if none selected
     if (!currentViewingVideo && allVideos.length > 0) {
       currentViewingVideo = allVideos[0];
-      document.getElementById("active-video-dot").classList.remove("hidden");
+      const dot = document.getElementById("active-video-dot");
+      if (dot) dot.classList.remove("hidden");
     }
   } catch (e) {
     console.error("Failed to load videos:", e);
@@ -89,6 +120,22 @@ function renderVideosGrid() {
     return matchSearch && matchCat;
   });
 
+  // Client-side sort fallback / consistency
+  filtered.sort((a, b) => {
+    if (currentSort === "recently_watched") {
+      const timeA = new Date(a.last_watched_at || a.updated_at || a.created_at).getTime();
+      const timeB = new Date(b.last_watched_at || b.updated_at || b.created_at).getTime();
+      return timeB - timeA;
+    } else if (currentSort === "newest") {
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    } else if (currentSort === "duration") {
+      return (b.duration_seconds || 0) - (a.duration_seconds || 0);
+    } else if (currentSort === "title") {
+      return (a.title || "").localeCompare(b.title || "");
+    }
+    return 0;
+  });
+
   if (filtered.length === 0) {
     grid.innerHTML = "";
     empty.classList.remove("hidden");
@@ -100,6 +147,7 @@ function renderVideosGrid() {
     const durationMin = Math.floor(v.duration_seconds / 60);
     const sections = v.smart_transcript || v.topic_notes || [];
     const bulletsCount = v.summary_bullets ? v.summary_bullets.length : 0;
+    const watchedTime = formatRelativeTime(v.last_watched_at || v.created_at);
 
     return `
       <div class="bg-dark-900 border border-dark-700/70 rounded-xl overflow-hidden shadow-sm hover:border-slate-700 transition-all flex flex-col justify-between group">
@@ -117,10 +165,17 @@ function renderVideosGrid() {
 
           <!-- Video Details -->
           <div class="p-4">
-            <h3 onclick="openReaderForVideo('${v.video_id}')" class="font-semibold text-white text-sm line-clamp-2 hover:text-brand-400 cursor-pointer transition-colors mb-1 leading-snug">
+            <h3 onclick="openReaderForVideo('${v.video_id}')" class="font-semibold text-white text-sm line-clamp-2 hover:text-brand-400 cursor-pointer transition-colors mb-1.5 leading-snug">
               ${v.title}
             </h3>
-            <p class="text-xs text-slate-400 mb-2">${v.channel_title}</p>
+            <div class="flex items-center gap-1.5 text-xs text-slate-400 mb-2">
+              <span class="text-slate-300 font-medium truncate max-w-[140px]">${v.channel_title}</span>
+              <span class="text-slate-600">•</span>
+              <span class="text-emerald-400/90 font-mono text-[10px] flex items-center gap-1" title="Watched: ${v.last_watched_at || v.created_at}">
+                <i data-lucide="clock" class="w-3 h-3 text-emerald-400"></i>
+                ${watchedTime}
+              </span>
+            </div>
           </div>
         </div>
 

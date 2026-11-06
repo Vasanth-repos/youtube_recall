@@ -4,7 +4,7 @@ from typing import List, Optional
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
 from sqlalchemy.orm import Session
-from sqlalchemy import desc
+from sqlalchemy import desc, func
 
 from backend.app.database import get_db
 from backend.app.models import Video, Flashcard, AppSetting
@@ -30,9 +30,26 @@ def process_video_pipeline(db: Session, video_req: VideoIntakeRequest) -> Video:
     if not raw_id:
         raise HTTPException(status_code=400, detail="Invalid YouTube URL or Video ID provided.")
 
+    # Parse watched_at
+    watched_at_dt = utcnow()
+    if video_req.watched_at:
+        try:
+            if isinstance(video_req.watched_at, str):
+                watched_at_dt = datetime.fromisoformat(video_req.watched_at.replace("Z", "+00:00"))
+            else:
+                watched_at_dt = video_req.watched_at
+        except Exception:
+            watched_at_dt = utcnow()
+
     # 1. Deduplication check
     existing = db.query(Video).filter(Video.video_id == raw_id).first()
     if existing and existing.status == "PROCESSED" and not video_req.force_process:
+        existing.last_watched_at = watched_at_dt
+        if video_req.watch_time_seconds and video_req.watch_time_seconds > existing.watch_time_seconds:
+            existing.watch_time_seconds = video_req.watch_time_seconds
+        existing.updated_at = utcnow()
+        db.commit()
+        db.refresh(existing)
         return existing
 
     # 2. Fetch metadata
@@ -103,6 +120,7 @@ def process_video_pipeline(db: Session, video_req: VideoIntakeRequest) -> Video:
     video_record.status = "PROCESSED"
     video_record.transcript_clean = clean_transcript[:10000] if clean_transcript else ""
     video_record.tags = meta.get("tags", [])
+    video_record.last_watched_at = watched_at_dt
 
     # Set AI properties
     video_record.summary_bullets = recall_data.get("summary_bullets", [])
@@ -184,6 +202,12 @@ def sync_youtube_history(payload: YouTubeHistorySyncRequest, db: Session = Depen
 
         existing = db.query(Video).filter(Video.video_id == raw_id).first()
         if existing and existing.status == "PROCESSED":
+            if item.watched_at:
+                try:
+                    existing.last_watched_at = datetime.fromisoformat(item.watched_at.replace("Z", "+00:00"))
+                    db.commit()
+                except Exception:
+                    pass
             already_synced += 1
             continue
 
@@ -192,7 +216,8 @@ def sync_youtube_history(payload: YouTubeHistorySyncRequest, db: Session = Depen
                 video_url_or_id=raw_id,
                 watch_time_seconds=item.watch_time_seconds or 180,
                 watch_percent=100.0,
-                force_process=True
+                force_process=True,
+                watched_at=item.watched_at
             )
             vid = process_video_pipeline(db, req)
             newly_synced += 1
@@ -213,11 +238,12 @@ def list_videos(
     status: Optional[str] = None,
     category: Optional[str] = None,
     query: Optional[str] = None,
+    sort_by: Optional[str] = Query("recently_watched", description="Sort: recently_watched, newest, title, duration"),
     skip: int = 0,
     limit: int = 50,
     db: Session = Depends(get_db)
 ):
-    """Lists saved videos with optional filtering and search."""
+    """Lists saved videos with optional filtering, search, and sorting (recently_watched, newest, title, duration)."""
     q = db.query(Video)
     if status:
         q = q.filter(Video.status == status)
@@ -226,7 +252,16 @@ def list_videos(
     if query:
         q = q.filter((Video.title.ilike(f"%{query}%")) | (Video.channel_title.ilike(f"%{query}%")))
     
-    return q.order_by(desc(Video.created_at)).offset(skip).limit(limit).all()
+    if sort_by == "newest":
+        q = q.order_by(desc(Video.created_at))
+    elif sort_by == "title":
+        q = q.order_by(Video.title.asc())
+    elif sort_by == "duration":
+        q = q.order_by(desc(Video.duration_seconds))
+    else:  # "recently_watched" is default
+        q = q.order_by(desc(func.coalesce(Video.last_watched_at, Video.updated_at, Video.created_at)))
+    
+    return q.offset(skip).limit(limit).all()
 
 @router.get("/{id_or_video_id}", response_model=VideoResponse)
 def get_video(id_or_video_id: str, db: Session = Depends(get_db)):

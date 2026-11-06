@@ -167,7 +167,8 @@ document.addEventListener("DOMContentLoaded", async () => {
                     video_url_or_id: videoId,
                     watch_time_seconds: 60,
                     watch_percent: 100,
-                    force_process: true
+                    force_process: true,
+                    watched_at: new Date().toISOString()
                   })
                 }).then(async (apiRes) => {
                   if (apiRes.ok) {

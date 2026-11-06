@@ -36,6 +36,7 @@ class Video(Base):
 
     created_at = Column(DateTime, default=utcnow)
     updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
+    last_watched_at = Column(DateTime, default=utcnow, index=True)
 
     flashcards = relationship("Flashcard", back_populates="video", cascade="all, delete-orphan")
 

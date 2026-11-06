@@ -107,7 +107,8 @@
           video_url_or_id: videoId,
           watch_time_seconds: activeWatchSeconds || 15,
           watch_percent: 100,
-          force_process: true
+          force_process: true,
+          watched_at: new Date().toISOString()
         })
       });
 
