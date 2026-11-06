@@ -40,22 +40,8 @@ async function loadStats() {
     if (!res.ok) return;
     const vids = await res.json();
     
-    let totalSections = 0;
-    let totalPoints = 0;
-
-    vids.forEach(v => {
-      const sections = v.smart_transcript || v.topic_notes || [];
-      totalSections += sections.length;
-      sections.forEach(s => {
-        const pts = s.crisp_points || s.takeaways || [];
-        totalPoints += pts.length;
-      });
-      totalPoints += (v.summary_bullets || []).length;
-    });
-
-    document.getElementById("stat-videos").textContent = vids.length;
-    document.getElementById("stat-sections").textContent = totalSections;
-    document.getElementById("stat-points").textContent = totalPoints;
+    const el = document.getElementById("stat-videos");
+    if (el) el.textContent = vids.length;
   } catch (e) {
     console.error("Failed to load stats:", e);
   }
@@ -104,51 +90,38 @@ function renderVideosGrid() {
     const bulletsCount = v.summary_bullets ? v.summary_bullets.length : 0;
 
     return `
-      <div class="bg-dark-800 border border-dark-700/80 rounded-xl overflow-hidden shadow-lg hover:border-slate-500 transition-all flex flex-col justify-between group">
+      <div class="bg-dark-900 border border-dark-700/70 rounded-xl overflow-hidden shadow-sm hover:border-slate-700 transition-all flex flex-col justify-between group">
         <div>
           <!-- Thumbnail & duration pill -->
-          <div class="relative aspect-video bg-dark-900 overflow-hidden cursor-pointer" onclick="openReaderForVideo('${v.video_id}')">
-            <img src="${v.thumbnail_url || 'https://img.youtube.com/vi/' + v.video_id + '/mqdefault.jpg'}" alt="${v.title}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300">
-            <span class="absolute bottom-2 right-2 px-2 py-0.5 rounded text-[11px] font-mono bg-black/80 text-white font-semibold">
+          <div class="relative aspect-video bg-dark-950 overflow-hidden cursor-pointer" onclick="openReaderForVideo('${v.video_id}')">
+            <img src="${v.thumbnail_url || 'https://img.youtube.com/vi/' + v.video_id + '/mqdefault.jpg'}" alt="${v.title}" class="w-full h-full object-cover group-hover:scale-102 transition-transform duration-300">
+            <span class="absolute bottom-2 right-2 px-1.5 py-0.5 rounded text-[10px] font-mono bg-black/85 text-white font-semibold">
               ${durationMin}m
             </span>
-            <span class="absolute top-2 left-2 px-2 py-0.5 rounded text-[10px] font-semibold tracking-wider uppercase bg-brand-500/20 text-brand-300 border border-brand-500/30 backdrop-blur">
+            <span class="absolute top-2 left-2 px-2 py-0.5 rounded text-[9px] font-semibold tracking-wider uppercase bg-black/75 text-brand-400 border border-brand-500/30 backdrop-blur">
               ${v.category}
             </span>
           </div>
 
           <!-- Video Details -->
           <div class="p-4">
-            <h3 onclick="openReaderForVideo('${v.video_id}')" class="font-semibold text-white text-sm line-clamp-2 hover:text-brand-400 cursor-pointer transition-colors mb-1">
+            <h3 onclick="openReaderForVideo('${v.video_id}')" class="font-semibold text-white text-sm line-clamp-2 hover:text-brand-400 cursor-pointer transition-colors mb-1 leading-snug">
               ${v.title}
             </h3>
-            <p class="text-xs text-slate-400 mb-3">${v.channel_title}</p>
-            
-            <!-- Summary bullet preview -->
-            ${bulletsCount > 0 ? `
-              <p class="text-xs text-slate-300 line-clamp-2 italic bg-dark-900/60 p-2.5 rounded-lg border border-dark-700/40">
-                "${v.summary_bullets[0]}"
-              </p>
-            ` : ''}
+            <p class="text-xs text-slate-400 mb-2">${v.channel_title}</p>
           </div>
         </div>
 
         <!-- Card Footer -->
-        <div class="p-4 pt-0 border-t border-dark-700/60 mt-3 flex items-center justify-between text-xs text-slate-400">
-          <div class="flex items-center gap-1.5 text-brand-400 font-medium">
-            <i data-lucide="align-left" class="w-3.5 h-3.5"></i>
-            <span>${sections.length} crisp sections</span>
-          </div>
-          <div class="flex items-center gap-1">
-            <button onclick="openReaderForVideo('${v.video_id}')" title="Read Smart Transcript" class="px-2.5 py-1 rounded-lg bg-brand-500/10 hover:bg-brand-500/20 text-brand-400 text-xs font-semibold flex items-center gap-1 transition-colors">
+        <div class="p-3.5 pt-0 border-t border-dark-800/80 mt-2 flex items-center justify-between text-xs text-slate-400">
+          <span class="text-[11px] text-slate-500 font-mono">${sections.length} chapters</span>
+          <div class="flex items-center gap-1.5">
+            <button onclick="openReaderForVideo('${v.video_id}')" title="Read Transcript" class="px-2.5 py-1 rounded-md bg-dark-800 hover:bg-dark-750 text-brand-400 text-xs font-medium flex items-center gap-1 transition-colors border border-dark-700">
               <i data-lucide="book-open" class="w-3.5 h-3.5"></i>
               <span>Read</span>
             </button>
-            <button onclick="downloadMarkdownById(${v.id})" title="Download Markdown" class="p-1.5 rounded-lg hover:bg-dark-700 hover:text-purple-400 transition-colors">
-              <i data-lucide="download" class="w-4 h-4"></i>
-            </button>
-            <button onclick="deleteVideoById(${v.id})" title="Delete" class="p-1.5 rounded-lg hover:bg-dark-700 hover:text-rose-400 transition-colors">
-              <i data-lucide="trash-2" class="w-4 h-4"></i>
+            <button onclick="deleteVideoById(${v.id})" title="Delete" class="p-1 rounded-md hover:bg-dark-800 text-slate-500 hover:text-rose-400 transition-colors">
+              <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
             </button>
           </div>
         </div>
@@ -239,8 +212,8 @@ function renderTranscriptSections(sections, videoId) {
   
   if (!sections || sections.length === 0) {
     container.innerHTML = `
-      <div class="bg-dark-800 border border-dark-700 rounded-xl p-6 text-center text-slate-400 text-sm">
-        No structured sections available for this video.
+      <div class="bg-dark-900 border border-dark-700/60 rounded-xl p-6 text-center text-slate-400 text-xs">
+        No chapter breakdown available for this video.
       </div>
     `;
     return;
@@ -255,52 +228,34 @@ function renderTranscriptSections(sections, videoId) {
     const polishedText = sec.polished_text || sec.summary || "";
 
     return `
-      <div class="transcript-section-card bg-dark-800 border border-dark-700/90 rounded-2xl p-6 shadow-md transition-all hover:border-slate-500" data-text="${(title + ' ' + crispPoints.join(' ') + ' ' + polishedText).toLowerCase()}">
+      <div class="transcript-section-card bg-dark-900 border border-dark-700/60 rounded-xl p-5 shadow-sm space-y-3 transition-colors hover:border-slate-700" data-text="${(title + ' ' + crispPoints.join(' ') + ' ' + polishedText).toLowerCase()}">
         
-        <!-- Section Header with Clickable Timestamp -->
-        <div class="flex flex-wrap items-center justify-between gap-3 mb-4 pb-3 border-b border-dark-700/60">
-          <div class="flex items-center gap-3">
-            <a href="${jumpUrl}" target="_blank" title="Jump to this exact moment in YouTube video" class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs font-mono font-bold transition-all hover:scale-105">
-              <i data-lucide="play" class="w-3 h-3 fill-emerald-400"></i>
-              <span>${tsLabel}</span>
-            </a>
-            <h3 class="font-bold text-white text-base tracking-tight">${title}</h3>
-          </div>
-          <span class="text-[11px] text-slate-500 uppercase tracking-wider font-semibold">Section ${idx + 1}</span>
+        <!-- Header: Timestamp + Title -->
+        <div class="flex items-center gap-2.5 pb-2 border-b border-dark-800">
+          <a href="${jumpUrl}" target="_blank" title="Jump to ${tsLabel} on YouTube" class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 font-mono text-xs font-semibold border border-emerald-500/20 transition-colors">
+            <i data-lucide="play" class="w-3 h-3 fill-emerald-400"></i>
+            <span>${tsLabel}</span>
+          </a>
+          <h3 class="font-semibold text-white text-sm tracking-tight">${title}</h3>
         </div>
 
-        <!-- Crisp Bullet Points (Core Value) -->
+        <!-- Crisp Bullet Points -->
         ${crispPoints.length > 0 ? `
-          <div class="bg-dark-900/80 border border-dark-700/80 rounded-xl p-4 mb-4">
-            <div class="text-[11px] font-bold uppercase tracking-wider text-brand-400 mb-2 flex items-center gap-1.5">
-              <i data-lucide="zap" class="w-3.5 h-3.5"></i>
-              <span>Crisp Takeaways</span>
-            </div>
-            <ul class="space-y-1.5">
-              ${crispPoints.map(pt => `
-                <li class="flex items-start gap-2 text-xs sm:text-sm text-slate-100">
-                  <span class="text-brand-400 font-bold">•</span>
-                  <span>${pt}</span>
-                </li>
-              `).join("")}
-            </ul>
-          </div>
+          <ul class="space-y-1.5 pl-0.5">
+            ${crispPoints.map(pt => `
+              <li class="flex items-start gap-2 text-xs sm:text-sm text-slate-100 leading-snug">
+                <span class="text-brand-400 font-bold select-none">•</span>
+                <span>${pt}</span>
+              </li>
+            `).join("")}
+          </ul>
         ` : ''}
 
-        <!-- Polished Cleaned-Up Transcript Text -->
+        <!-- Polished Reading Paragraph -->
         ${polishedText ? `
-          <details class="group cursor-pointer">
-            <summary class="text-xs font-semibold text-slate-400 hover:text-slate-200 flex items-center justify-between select-none py-1">
-              <span class="flex items-center gap-1.5">
-                <i data-lucide="file-text" class="w-3.5 h-3.5 text-cyan-400"></i>
-                <span>Cleaned Spoken Transcript (Verbal fluff removed)</span>
-              </span>
-              <span class="text-[10px] text-slate-500 group-open:rotate-180 transition-transform">▼</span>
-            </summary>
-            <div class="mt-2.5 pt-2.5 border-t border-dark-700/60 text-xs text-slate-300 leading-relaxed font-sans bg-dark-900/50 p-3 rounded-lg">
-              ${polishedText}
-            </div>
-          </details>
+          <p class="text-xs text-slate-400 leading-relaxed pt-2.5 border-t border-dark-800/80">
+            ${polishedText}
+          </p>
         ` : ''}
 
       </div>
@@ -344,8 +299,10 @@ function copyCrispPoints() {
 
   navigator.clipboard.writeText(out).then(() => {
     const btnText = document.getElementById("copy-points-text");
-    btnText.textContent = "✓ Copied to Clipboard!";
-    setTimeout(() => btnText.textContent = "Copy Crisp Takeaways", 2000);
+    if (btnText) {
+      btnText.textContent = "✓ Copied!";
+      setTimeout(() => btnText.textContent = "Copy Notes", 2000);
+    }
   });
 }
 
@@ -428,7 +385,8 @@ function closeCaptureModal() {
 
 async function submitVideoIntake() {
   const url = document.getElementById("intake-url").value.trim();
-  const force = document.getElementById("intake-force").checked;
+  const forceEl = document.getElementById("intake-force");
+  const force = forceEl ? (forceEl.type === "checkbox" ? forceEl.checked : forceEl.value === "true") : true;
 
   if (!url) {
     alert("Please enter a YouTube video URL or ID.");
