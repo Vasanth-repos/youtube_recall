@@ -99,22 +99,25 @@
       </div>
     `, false, 0);
 
-    try {
-      const response = await fetch(`${SERVER_URL}/api/videos/intake`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          video_url_or_id: videoId,
-          watch_time_seconds: activeWatchSeconds || 15,
-          watch_percent: 100,
-          force_process: true,
-          watched_at: new Date().toISOString()
-        })
-      });
+    chrome.runtime.sendMessage({
+      action: "intake_video",
+      payload: {
+        video_url_or_id: videoId,
+        watch_time_seconds: activeWatchSeconds || 15,
+        watch_percent: 100,
+        force_process: true,
+        watched_at: new Date().toISOString()
+      }
+    }, (response) => {
+      isTranscribing = false;
+      if (chrome.runtime.lastError) {
+        console.warn("YouTube Recall background communication notice:", chrome.runtime.lastError.message);
+        updateButtonState("offline");
+        showToast(`<span>❌ Backend offline or extension reloading</span>`, false, 4000);
+        return;
+      }
 
-      const data = await response.json();
-
-      if (response.ok) {
+      if (response && response.success) {
         markVideoProcessed(videoId);
         updateButtonState("saved");
 
@@ -127,15 +130,9 @@
         `, true, 9000);
       } else {
         updateButtonState("error");
-        showToast(`<span>⚠️ Intake Notice: ${data.detail || 'Could not process'}</span>`, false, 4000);
+        showToast(`<span>⚠️ Intake Notice: ${response ? response.error : 'Could not process'}</span>`, false, 4000);
       }
-    } catch (err) {
-      console.warn("YouTube Recall Backend is offline at", SERVER_URL);
-      updateButtonState("offline");
-      showToast(`<span>❌ Backend offline at localhost:8000</span>`, false, 4000);
-    } finally {
-      isTranscribing = false;
-    }
+    });
   }
 
   // Inject or update button inside YouTube player controls

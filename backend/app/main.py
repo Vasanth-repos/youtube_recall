@@ -27,6 +27,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Private Network Access header support for Chrome
+@app.middleware("http")
+async def add_private_network_headers(request, call_next):
+    response = await call_next(request)
+    response.headers["Access-Control-Allow-Private-Network"] = "true"
+    return response
+
 # Include API Routers
 app.include_router(videos.router)
 app.include_router(flashcards.router)

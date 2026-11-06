@@ -1,10 +1,42 @@
 // YouTube Recall - Background Service Worker for Continuous Watch History Sync
-const SERVER_URL = "http://localhost:8000";
+const SERVER_URLS = ["http://localhost:8000", "http://127.0.0.1:8000"];
 const ALARM_NAME = "sync_youtube_history_alarm";
 const SYNC_INTERVAL_MINUTES = 2; // Auto-sync background history every 2 minutes
 
 // In-memory debounce set to avoid duplicate rapid requests
 const recentlySyncedSet = new Set();
+
+// Helper to post to backend with fallback between localhost and 127.0.0.1
+async function postToBackend(endpoint, payload) {
+  let lastErr = null;
+  for (const base of SERVER_URLS) {
+    try {
+      const resp = await fetch(`${base}${endpoint}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      return resp;
+    } catch (e) {
+      lastErr = e;
+    }
+  }
+  throw lastErr || new Error("Backend offline at localhost:8000");
+}
+
+// Helper to get from backend with fallback
+async function getFromBackend(endpoint) {
+  let lastErr = null;
+  for (const base of SERVER_URLS) {
+    try {
+      const resp = await fetch(`${base}${endpoint}`, { method: "GET" });
+      if (resp.ok) return resp;
+    } catch (e) {
+      lastErr = e;
+    }
+  }
+  throw lastErr || new Error("Backend offline at localhost:8000");
+}
 
 // Initialize periodic sync alarm on extension load & startup
 chrome.runtime.onInstalled.addListener(() => {
@@ -13,7 +45,6 @@ chrome.runtime.onInstalled.addListener(() => {
     delayInMinutes: 0.1
   });
   console.log("YouTube Recall background auto-sync worker initialized.");
-  // Immediate initial sync of recent watch history
   syncYouTubeHistory(25).catch(() => {});
 });
 
@@ -62,21 +93,16 @@ async function autoSyncVideo(videoId, title, visitedTime) {
   try {
     console.log(`[YouTube Recall] Auto-capturing watched video: ${videoId} ('${cleanTitle}')`);
 
-    const resp = await fetch(`${SERVER_URL}/api/videos/intake`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        video_url_or_id: videoId,
-        watch_time_seconds: 60,
-        watch_percent: 100,
-        force_process: true,
-        watched_at: watchedAt
-      })
+    const resp = await postToBackend("/api/videos/intake", {
+      video_url_or_id: videoId,
+      watch_time_seconds: 60,
+      watch_percent: 100,
+      force_process: true,
+      watched_at: watchedAt
     });
 
-    if (resp.ok) {
+    if (resp && resp.ok) {
       console.log(`[YouTube Recall] ✓ Video ${videoId} auto-synced into smart transcript!`);
-      // Flash a green badge on extension icon to give subtle confirmation
       if (chrome.action && chrome.action.setBadgeText) {
         chrome.action.setBadgeText({ text: "✓" });
         chrome.action.setBadgeBackgroundColor({ color: "#22c55e" });
@@ -90,7 +116,7 @@ async function autoSyncVideo(videoId, title, visitedTime) {
   }
 }
 
-// 1. Instant trigger on Chrome browsing history visits (fires the instant any YouTube video is visited)
+// 1. Instant trigger on Chrome browsing history visits
 chrome.history.onVisited.addListener((historyItem) => {
   if (historyItem.url && (historyItem.url.includes("youtube.com/watch") || historyItem.url.includes("youtu.be/"))) {
     const videoId = extractVideoId(historyItem.url);
@@ -114,7 +140,6 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
 // Synchronize YouTube watch history from Chrome's browsing history in batch
 async function syncYouTubeHistory(maxResults = 25) {
   return new Promise((resolve, reject) => {
-    // Look for YouTube watch URLs from the past 7 days
     const oneWeekAgo = Date.now() - (7 * 24 * 60 * 60 * 1000);
 
     chrome.history.search(
@@ -134,7 +159,6 @@ async function syncYouTubeHistory(maxResults = 25) {
           });
         }
 
-        // Deduplicate videos by ID
         const seenIds = new Set();
         const itemsToSync = [];
 
@@ -161,20 +185,15 @@ async function syncYouTubeHistory(maxResults = 25) {
           });
         }
 
-        // Retrieve stored YouTube account info
         chrome.storage.local.get(["yt_account_info"], async (res) => {
           const account = res.yt_account_info || {};
 
           try {
-            const resp = await fetch(`${SERVER_URL}/api/videos/sync-history`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                items: itemsToSync,
-                account_name: account.account_name || "Vasanthabalan",
-                account_email: account.account_email || "vasanthabalanb4@gmail.com",
-                avatar_url: account.avatar_url || ""
-              })
+            const resp = await postToBackend("/api/videos/sync-history", {
+              items: itemsToSync,
+              account_name: account.account_name || "Vasanthabalan",
+              account_email: account.account_email || "vasanthabalanb4@gmail.com",
+              avatar_url: account.avatar_url || ""
             });
 
             if (!resp.ok) {
@@ -184,7 +203,6 @@ async function syncYouTubeHistory(maxResults = 25) {
 
             const data = await resp.json();
             
-            // Cache sync stats
             chrome.storage.local.set({
               last_history_sync_time: Date.now(),
               last_sync_stats: data
@@ -195,7 +213,7 @@ async function syncYouTubeHistory(maxResults = 25) {
               ...data
             });
           } catch (fetchErr) {
-            console.warn("YouTube Recall Backend server unreachable at", SERVER_URL);
+            console.warn("YouTube Recall Backend server unreachable:", fetchErr);
             reject(fetchErr);
           }
         });
@@ -206,6 +224,41 @@ async function syncYouTubeHistory(maxResults = 25) {
 
 // Listen for messages from Content Scripts and Popup
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (request.action === "intake_video") {
+    postToBackend("/api/videos/intake", request.payload)
+      .then(async (resp) => {
+        if (!resp.ok) {
+          const errData = await resp.json().catch(() => ({}));
+          return sendResponse({ success: false, error: errData.detail || "Server error" });
+        }
+        const data = await resp.json();
+        if (chrome.action && chrome.action.setBadgeText) {
+          chrome.action.setBadgeText({ text: "✓" });
+          chrome.action.setBadgeBackgroundColor({ color: "#22c55e" });
+          setTimeout(() => {
+            chrome.action.setBadgeText({ text: "" });
+          }, 6000);
+        }
+        sendResponse({ success: true, data: data });
+      })
+      .catch((err) => {
+        sendResponse({ success: false, error: err.message });
+      });
+    return true; // Keep channel open for async response
+  }
+
+  if (request.action === "check_health") {
+    getFromBackend("/api/health")
+      .then(async (resp) => {
+        const data = await resp.json();
+        sendResponse({ online: true, data: data });
+      })
+      .catch((err) => {
+        sendResponse({ online: false, error: err.message });
+      });
+    return true;
+  }
+
   if (request.action === "auto_sync_video") {
     autoSyncVideo(request.videoId, request.title, request.watched_at)
       .then(() => sendResponse({ success: true }))
@@ -217,22 +270,17 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     syncYouTubeHistory(request.maxCount || 30)
       .then((result) => sendResponse(result))
       .catch((err) => sendResponse({ success: false, error: err.message }));
-    return true; // Keep message channel open for async response
+    return true;
   }
 
   if (request.action === "update_account_info") {
     chrome.storage.local.set({ yt_account_info: request.account_info }, () => {
-      // Also notify backend of active YouTube account session
-      fetch(`${SERVER_URL}/api/youtube/browser-account`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          account_name: request.account_info.account_name || "Vasanthabalan",
-          account_email: request.account_info.account_email || "vasanthabalanb4@gmail.com",
-          avatar_url: request.account_info.avatar_url || "",
-          channel_id: request.account_info.channel_id || "",
-          linked_method: "browser_extension"
-        })
+      postToBackend("/api/youtube/browser-account", {
+        account_name: request.account_info.account_name || "Vasanthabalan",
+        account_email: request.account_info.account_email || "vasanthabalanb4@gmail.com",
+        avatar_url: request.account_info.avatar_url || "",
+        channel_id: request.account_info.channel_id || "",
+        linked_method: "browser_extension"
       }).catch(() => {});
       sendResponse({ success: true });
     });

@@ -17,18 +17,32 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // 1. Check server health & linked account status
   let isServerOnline = false;
-  try {
-    const res = await fetch(`${SERVER_URL}/api/health`, { method: "GET" });
-    if (res.ok) {
-      serverStatus.textContent = "Server Online";
-      serverStatus.className = "status-pill";
-      isServerOnline = true;
-    } else {
-      throw new Error();
-    }
-  } catch (e) {
-    serverStatus.textContent = "Server Offline";
-    serverStatus.className = "status-pill offline";
+  let activeServerUrl = "http://localhost:8000";
+
+  for (const candidate of ["http://localhost:8000", "http://127.0.0.1:8000"]) {
+    try {
+      const res = await fetch(`${candidate}/api/health`, { method: "GET" });
+      if (res.ok) {
+        serverStatus.textContent = "Server Online";
+        serverStatus.className = "status-pill";
+        isServerOnline = true;
+        activeServerUrl = candidate;
+        break;
+      }
+    } catch (e) {}
+  }
+
+  if (!isServerOnline) {
+    chrome.runtime.sendMessage({ action: "check_health" }, (resp) => {
+      if (resp && resp.online) {
+        serverStatus.textContent = "Server Online";
+        serverStatus.className = "status-pill";
+        isServerOnline = true;
+      } else {
+        serverStatus.textContent = "Server Offline";
+        serverStatus.className = "status-pill offline";
+      }
+    });
   }
 
   // Load account info from storage or server
@@ -53,7 +67,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
 
   if (isServerOnline) {
-    fetch(`${SERVER_URL}/api/youtube/status`)
+    fetch(`${activeServerUrl}/api/youtube/status`)
       .then((r) => r.json())
       .then((data) => {
         if (data.is_linked) {
@@ -159,26 +173,24 @@ document.addEventListener("DOMContentLoaded", async () => {
           try {
             chrome.tabs.sendMessage(activeTab.id, { action: "manual_trigger" }, (res) => {
               if (chrome.runtime.lastError || !res) {
-                // Direct fallback API call
-                fetch(`${SERVER_URL}/api/videos/intake`, {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({
+                // Background service worker fallback API call
+                chrome.runtime.sendMessage({
+                  action: "intake_video",
+                  payload: {
                     video_url_or_id: videoId,
                     watch_time_seconds: 60,
                     watch_percent: 100,
                     force_process: true,
                     watched_at: new Date().toISOString()
-                  })
-                }).then(async (apiRes) => {
-                  if (apiRes.ok) {
+                  }
+                }, (apiRes) => {
+                  if (apiRes && apiRes.success) {
                     mainBtn.disabled = false;
                     mainBtn.innerHTML = "<span>📖 Open in Smart Reader</span>";
                     autoStatusText.textContent = "✓ AI Smart Transcript Ready!";
-                    mainBtn.onclick = () => chrome.tabs.create({ url: `${SERVER_URL}/?v=${videoId}` });
+                    mainBtn.onclick = () => chrome.tabs.create({ url: `${activeServerUrl}/?v=${videoId}` });
                   } else {
-                    const err = await apiRes.json();
-                    alert("Intake Notice: " + (err.detail || "Could not transcribe"));
+                    alert("Intake Notice: " + (apiRes ? apiRes.error : "Could not transcribe"));
                     mainBtn.disabled = false;
                     mainBtn.innerHTML = "<span>⚡ Transcribe Now</span>";
                   }
