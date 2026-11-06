@@ -677,6 +677,60 @@ async function saveSettings() {
   }
 }
 
+async function testGeminiKey() {
+  const geminiEl = document.getElementById("setting-gemini-key");
+  const resultEl = document.getElementById("gemini-test-result");
+  const testBtn = document.getElementById("btn-test-gemini");
+  const key = geminiEl ? geminiEl.value.trim() : "";
+
+  if (resultEl) {
+    resultEl.classList.remove("hidden", "text-emerald-400", "text-rose-400");
+    resultEl.classList.add("text-amber-400");
+    resultEl.innerHTML = "<span>⏳ Testing key against Google Gemini Cloud...</span>";
+  }
+  if (testBtn) testBtn.disabled = true;
+
+  try {
+    const res = await fetch("/api/settings/test-gemini", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ api_key: key })
+    });
+    const data = await res.json();
+    if (data.valid) {
+      if (resultEl) {
+        resultEl.className = "text-[11px] mt-1.5 text-emerald-400 font-medium";
+        resultEl.innerHTML = `✓ Connected to <b>${data.active_model}</b>! Ready for high-speed online synthesis.`;
+      }
+    } else {
+      if (resultEl) {
+        resultEl.className = "text-[11px] mt-1.5 text-rose-400";
+        resultEl.innerHTML = `⚠️ ${data.error || "Failed to validate Gemini key."}`;
+      }
+    }
+  } catch (err) {
+    if (resultEl) {
+      resultEl.className = "text-[11px] mt-1.5 text-rose-400";
+      resultEl.innerHTML = `⚠️ Network error: ${err.message}`;
+    }
+  } finally {
+    if (testBtn) testBtn.disabled = false;
+  }
+}
+
+function copyCurrentOrigin() {
+  const origin = window.location.origin;
+  navigator.clipboard.writeText(origin).then(() => {
+    const toast = document.getElementById("copy-url-toast");
+    if (toast) {
+      toast.classList.remove("hidden");
+      setTimeout(() => toast.classList.add("hidden"), 3000);
+    }
+  }).catch(() => {
+    prompt("Copy this URL for your Android app:", origin);
+  });
+}
+
 // YouTube Account Status & Sync
 async function loadAccountStatus() {
   try {

@@ -15,7 +15,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   const accountAvatarPl = document.getElementById("account-avatar-placeholder");
   const accountStatusLabel = document.getElementById("account-status-label");
 
-  // 1. Check server health & linked account status
+  // 1. Check server health & linked account status across candidate URLs
   let isServerOnline = false;
   let activeServerUrl = "http://localhost:8000";
 
@@ -34,7 +34,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   if (!isServerOnline) {
     chrome.runtime.sendMessage({ action: "check_health" }, (resp) => {
-      const err = chrome.runtime.lastError;
+      const err = chrome.runtime.lastError; // Consume
       if (resp && resp.online) {
         serverStatus.textContent = "Server Online";
         serverStatus.className = "status-pill";
@@ -48,7 +48,8 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // Load account info from storage or server
   chrome.storage.local.get(["yt_account_info", "last_sync_stats"], (res) => {
-    const acc = res.yt_account_info;
+    if (chrome.runtime.lastError) {} // Consume
+    const acc = res && res.yt_account_info;
     if (acc) {
       if (acc.account_name && accountNameEl) accountNameEl.textContent = acc.account_name;
       if (acc.account_email && accountEmailEl) accountEmailEl.textContent = acc.account_email;
@@ -60,7 +61,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (accountStatusLabel) accountStatusLabel.textContent = "Account Linked & Auto-Syncing";
     }
 
-    if (res.last_sync_stats) {
+    if (res && res.last_sync_stats) {
       const stats = res.last_sync_stats;
       syncStatus.style.display = "block";
       syncStatus.textContent = `Last sync: ${stats.newly_synced || 0} new, ${stats.already_synced || 0} existing videos.`;
@@ -71,7 +72,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     fetch(`${activeServerUrl}/api/youtube/status`)
       .then((r) => r.json())
       .then((data) => {
-        if (data.is_linked) {
+        if (data && data.is_linked) {
           if (data.account_name && accountNameEl) accountNameEl.textContent = data.account_name;
           if (data.account_email && accountEmailEl) accountEmailEl.textContent = data.account_email;
           if (data.avatar_url && accountAvatarImg) {
@@ -85,97 +86,113 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   // 2. Sync YouTube Watch History Button Click
-  syncBtn.addEventListener("click", () => {
-    syncBtn.disabled = true;
-    syncBtn.innerHTML = "<span>⏳ Syncing Watch History...</span>";
-    syncStatus.style.display = "block";
-    syncStatus.textContent = "Fetching videos from your YouTube watch history...";
+  if (syncBtn) {
+    syncBtn.addEventListener("click", () => {
+      syncBtn.disabled = true;
+      syncBtn.innerHTML = "<span>⏳ Syncing Watch History...</span>";
+      syncStatus.style.display = "block";
+      syncStatus.textContent = "Fetching videos from your YouTube watch history...";
 
-    chrome.runtime.sendMessage({ action: "manual_history_sync", maxCount: 30 }, (res) => {
-      const err = chrome.runtime.lastError;
-      syncBtn.disabled = false;
-      syncBtn.innerHTML = "<span>⚡ Sync YouTube Watch History</span>";
+      chrome.runtime.sendMessage({ action: "manual_history_sync", maxCount: 30 }, (res) => {
+        const err = chrome.runtime.lastError;
+        syncBtn.disabled = false;
+        syncBtn.innerHTML = "<span>⚡ Sync YouTube Watch History</span>";
 
-      if (res && res.success) {
-        syncStatus.innerHTML = `<span style="color: #4ade80; font-weight: 600;">✓ Synced ${res.newly_synced} new video(s)!</span> (${res.already_synced} already in library)`;
-      } else {
-        syncStatus.innerHTML = `<span style="color: #f87171;">⚠️ Sync notice: ${res && res.error ? res.error : "Server reconnecting"}</span>`;
-      }
+        if (res && res.success) {
+          syncStatus.innerHTML = `<span style="color: #4ade80; font-weight: 600;">✓ Synced ${res.newly_synced || 0} new video(s)!</span> (${res.already_synced || 0} already in library)`;
+        } else {
+          const msg = (res && (res.message || res.error)) || (err && err.message) || "Backend reconnecting";
+          syncStatus.innerHTML = `<span style="color: #f87171;">⚠️ Sync notice: ${msg}</span>`;
+        }
+      });
     });
-  });
+  }
 
   // 3. Query active YouTube tab
   chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
-    const activeTab = tabs[0];
+    if (chrome.runtime.lastError) {}
+    const activeTab = tabs && tabs[0];
     if (!activeTab || !activeTab.url || !activeTab.url.includes("youtube.com/watch")) {
-      activeView.style.display = "none";
-      inactiveView.style.display = "block";
+      if (activeView) activeView.style.display = "none";
+      if (inactiveView) inactiveView.style.display = "block";
       return;
     }
 
-    activeView.style.display = "block";
-    inactiveView.style.display = "none";
+    if (activeView) activeView.style.display = "block";
+    if (inactiveView) inactiveView.style.display = "none";
 
-    const urlParams = new URL(activeTab.url).searchParams;
-    const videoId = urlParams.get("v");
+    let videoId = null;
+    try {
+      const urlParams = new URL(activeTab.url).searchParams;
+      videoId = urlParams.get("v");
+    } catch (e) {}
 
     if (!videoId) {
-      activeView.style.display = "none";
-      inactiveView.style.display = "block";
+      if (activeView) activeView.style.display = "none";
+      if (inactiveView) inactiveView.style.display = "block";
       return;
     }
 
     // Set fallback title from tab
-    ytTitle.textContent = (activeTab.title || "YouTube Video").replace(" - YouTube", "");
+    if (ytTitle) {
+      ytTitle.textContent = (activeTab.title || "YouTube Video").replace(" - YouTube", "");
+    }
 
     // Check directly if already in backend DB
     let isAlreadyInDb = false;
     if (isServerOnline) {
       try {
-        const checkRes = await fetch(`${SERVER_URL}/api/videos/${videoId}`);
+        const checkRes = await fetch(`${activeServerUrl}/api/videos/${videoId}`);
         if (checkRes.ok) {
           isAlreadyInDb = true;
           const vidData = await checkRes.json();
-          if (vidData.title) ytTitle.textContent = vidData.title;
+          if (vidData && vidData.title && ytTitle) {
+            ytTitle.textContent = vidData.title;
+          }
         }
       } catch (e) {}
     }
 
     // Query status from content script safely
     chrome.tabs.sendMessage(activeTab.id, { action: "get_status" }, (status) => {
-      const lastErr = chrome.runtime.lastError; // Explicitly consume lastError to prevent Chrome from logging it
+      const lastErr = chrome.runtime.lastError; // Consumed
       const isProcessed = isAlreadyInDb || (status && status.isProcessed);
       const isTranscribing = status && status.isTranscribing;
 
-      if (status && status.title) {
+      if (status && status.title && ytTitle) {
         ytTitle.textContent = status.title;
       }
 
       if (isProcessed) {
-        autoStatusText.textContent = "✓ AI Smart Transcript Ready!";
-        mainBtn.innerHTML = "<span>📖 Open in Smart Reader</span>";
-        mainBtn.disabled = false;
-        mainBtn.onclick = () => {
-          chrome.tabs.create({ url: `${SERVER_URL}/?v=${videoId}` });
-        };
+        if (autoStatusText) autoStatusText.textContent = "✓ AI Smart Transcript Ready!";
+        if (mainBtn) {
+          mainBtn.innerHTML = "<span>📖 Open in Smart Reader</span>";
+          mainBtn.disabled = false;
+          mainBtn.onclick = () => {
+            chrome.tabs.create({ url: `${activeServerUrl}/?v=${videoId}` });
+          };
+        }
       } else if (isTranscribing) {
-        autoStatusText.textContent = "⏳ Distilling clean transcript...";
-        mainBtn.innerHTML = "<span>⏳ AI Processing Now...</span>";
-        mainBtn.disabled = true;
+        if (autoStatusText) autoStatusText.textContent = "⏳ Distilling clean transcript...";
+        if (mainBtn) {
+          mainBtn.innerHTML = "<span>⏳ AI Processing Now...</span>";
+          mainBtn.disabled = true;
+        }
       } else {
         const seconds = status ? (status.activeWatchSeconds || 0) : 0;
-        autoStatusText.textContent = `Auto-capturing playback (${seconds}/8s)`;
-        mainBtn.innerHTML = "<span>⚡ Transcribe Now</span>";
-        mainBtn.disabled = !isServerOnline;
-        
-        mainBtn.onclick = async () => {
-          mainBtn.disabled = true;
-          mainBtn.innerHTML = "<span>⏳ Synthesizing...</span>";
-          autoStatusText.textContent = "Transcribing in background...";
+        if (autoStatusText) autoStatusText.textContent = `Auto-capturing playback (${seconds}/8s)`;
+        if (mainBtn) {
+          mainBtn.innerHTML = "<span>⚡ Transcribe Now</span>";
+          mainBtn.disabled = !isServerOnline;
+          
+          mainBtn.onclick = async () => {
+            mainBtn.disabled = true;
+            mainBtn.innerHTML = "<span>⏳ Synthesizing...</span>";
+            if (autoStatusText) autoStatusText.textContent = "Transcribing in background...";
 
-          try {
             chrome.tabs.sendMessage(activeTab.id, { action: "manual_trigger" }, (res) => {
-              if (chrome.runtime.lastError || !res) {
+              const tabErr = chrome.runtime.lastError; // Consumed
+              if (tabErr || !res) {
                 // Background service worker fallback API call
                 chrome.runtime.sendMessage({
                   action: "intake_video",
@@ -187,14 +204,15 @@ document.addEventListener("DOMContentLoaded", async () => {
                     watched_at: new Date().toISOString()
                   }
                 }, (apiRes) => {
-                  const portErr = chrome.runtime.lastError;
+                  const portErr = chrome.runtime.lastError; // Consumed
                   if (apiRes && apiRes.success) {
                     mainBtn.disabled = false;
                     mainBtn.innerHTML = "<span>📖 Open in Smart Reader</span>";
-                    autoStatusText.textContent = "✓ AI Smart Transcript Ready!";
+                    if (autoStatusText) autoStatusText.textContent = "✓ AI Smart Transcript Ready!";
                     mainBtn.onclick = () => chrome.tabs.create({ url: `${activeServerUrl}/?v=${videoId}` });
                   } else {
-                    alert("Intake Notice: " + (apiRes ? apiRes.error : "Could not transcribe"));
+                    const intakeMsg = apiRes && apiRes.error ? apiRes.error : "Could not transcribe";
+                    alert("Intake Notice: " + intakeMsg);
                     mainBtn.disabled = false;
                     mainBtn.innerHTML = "<span>⚡ Transcribe Now</span>";
                   }
@@ -202,16 +220,12 @@ document.addEventListener("DOMContentLoaded", async () => {
               } else {
                 mainBtn.disabled = false;
                 mainBtn.innerHTML = "<span>📖 Open in Smart Reader</span>";
-                autoStatusText.textContent = "✓ AI Smart Transcript Ready!";
-                mainBtn.onclick = () => chrome.tabs.create({ url: `${SERVER_URL}/?v=${videoId}` });
+                if (autoStatusText) autoStatusText.textContent = "✓ AI Smart Transcript Ready!";
+                mainBtn.onclick = () => chrome.tabs.create({ url: `${activeServerUrl}/?v=${videoId}` });
               }
             });
-          } catch (err) {
-            alert("Error connecting to backend: " + err.message);
-            mainBtn.disabled = false;
-            mainBtn.innerHTML = "<span>⚡ Transcribe Now</span>";
-          }
-        };
+          };
+        }
       }
     });
   });

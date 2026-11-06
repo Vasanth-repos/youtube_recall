@@ -158,6 +158,51 @@ class AIService:
         return True
 
     @classmethod
+    def get_gemini_key(cls, explicit_key: Optional[str] = None) -> Optional[str]:
+        """Dynamically resolves Gemini API key from explicit arg, env var, or SQLite AppSetting."""
+        if explicit_key and explicit_key.strip():
+            return explicit_key.strip()
+        env_key = os.environ.get("GEMINI_API_KEY")
+        if env_key and env_key.strip():
+            return env_key.strip()
+        if settings.GEMINI_API_KEY and settings.GEMINI_API_KEY.strip():
+            return settings.GEMINI_API_KEY.strip()
+        try:
+            from backend.app.database import SessionLocal
+            from backend.app.models.video import AppSetting
+            with SessionLocal() as db:
+                row = db.query(AppSetting).filter(
+                    (AppSetting.key == "GEMINI_API_KEY") | (AppSetting.key == "gemini_api_key")
+                ).first()
+                if row and row.value and row.value.strip():
+                    return row.value.strip()
+        except Exception:
+            pass
+        return None
+
+    @classmethod
+    def test_gemini_key(cls, api_key: str) -> Dict[str, Any]:
+        """Validates a Gemini API key with live high-speed candidate models."""
+        candidate_models = ["gemini-flash-lite-latest", "gemini-3.5-flash-lite", "gemini-3.1-flash-lite"]
+        for model in candidate_models:
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
+            payload = {
+                "contents": [{"parts": [{"text": "Reply with JSON: {\"status\": \"ok\", \"model\": \"" + model + "\"}"}]}],
+                "generationConfig": {"response_mime_type": "application/json"}
+            }
+            try:
+                resp = requests.post(url, json=payload, timeout=8)
+                if resp.status_code == 200:
+                    return {"valid": True, "active_model": model, "message": f"Successfully connected to Google Gemini ({model})"}
+                elif resp.status_code == 400:
+                    return {"valid": False, "error": f"Invalid Gemini API key or request format (HTTP 400)"}
+                elif resp.status_code == 403:
+                    return {"valid": False, "error": f"Permission denied or invalid key (HTTP 403)"}
+            except Exception as e:
+                logger.warning(f"Error testing key with model {model}: {e}")
+        return {"valid": False, "error": "Could not connect to Gemini models with this key."}
+
+    @classmethod
     def generate_recall_assets(
         cls,
         title: str,
@@ -188,7 +233,7 @@ class AIService:
         )
 
         # 1. Try Gemini Free Tier
-        gemini_key = api_key or settings.GEMINI_API_KEY
+        gemini_key = cls.get_gemini_key(api_key)
         if (active_provider == "gemini" or gemini_key) and gemini_key:
             try:
                 result = cls._call_gemini(prompt, gemini_key)
@@ -242,7 +287,13 @@ class AIService:
     @classmethod
     def _call_gemini(cls, prompt: str, api_key: str) -> Optional[Dict[str, Any]]:
         """Calls Google AI Studio / Gemini API using candidate models with automatic fallback."""
-        candidate_models = ["gemini-3.5-flash", "gemini-3.5-flash-lite"]
+        candidate_models = [
+            "gemini-flash-lite-latest",
+            "gemini-3.5-flash-lite",
+            "gemini-3.1-flash-lite",
+            "gemini-3.8-flash",
+            "gemini-3.5-flash"
+        ]
         for model in candidate_models:
             url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
             payload = {

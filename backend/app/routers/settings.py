@@ -1,11 +1,13 @@
-from typing import Dict, Any
-from fastapi import APIRouter, Depends
+import os
+from typing import Dict, Any, Optional
+from fastapi import APIRouter, Depends, Body
 from sqlalchemy.orm import Session
 
 from backend.app.database import get_db
 from backend.app.models import AppSetting
 from backend.app.schemas import SettingsUpdate
 from backend.app.config import settings
+from backend.app.services.ai_service import AIService
 
 router = APIRouter(prefix="/api/settings", tags=["Settings & Integrations"])
 
@@ -17,7 +19,7 @@ def get_current_settings(db: Session = Depends(get_db)) -> Dict[str, Any]:
     def get_val(key: str, default: str) -> str:
         return db_settings.get(key, default)
 
-    gemini_key = get_val("GEMINI_API_KEY", settings.GEMINI_API_KEY)
+    gemini_key = AIService.get_gemini_key()
     groq_key = get_val("GROQ_API_KEY", settings.GROQ_API_KEY)
     notion_key = get_val("NOTION_API_KEY", settings.NOTION_API_KEY)
 
@@ -46,6 +48,22 @@ def update_settings(payload: SettingsUpdate, db: Session = Depends(get_db)):
             existing.value = str(value)
         else:
             db.add(AppSetting(key=key, value=str(value)))
+        if key in ["GEMINI_API_KEY", "gemini_api_key"]:
+            os.environ["GEMINI_API_KEY"] = str(value)
     db.commit()
     return {"success": True, "message": "Settings updated successfully."}
+
+@router.post("/test-gemini")
+def test_gemini(payload: Optional[Dict[str, Any]] = Body(None), db: Session = Depends(get_db)):
+    """Tests live connection to Google Gemini API using provided or stored key."""
+    key = None
+    if payload and payload.get("api_key"):
+        key = str(payload["api_key"]).strip()
+    if not key:
+        key = AIService.get_gemini_key()
+    if not key:
+        return {"valid": False, "error": "No Gemini API key provided or found in settings."}
+    
+    return AIService.test_gemini_key(key)
+
 

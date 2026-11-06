@@ -556,8 +556,28 @@
           </div>
 
           <div>
-            <label class="block text-xs text-zinc-400 mb-1">Google Gemini API Key</label>
+            <div class="flex items-center justify-between mb-1">
+              <label class="block text-xs text-zinc-400">Google Gemini API Key</label>
+              <button onclick="testGeminiKey()" id="btn-test-gemini" type="button" class="text-[11px] font-semibold text-amber-400 hover:text-amber-300 transition-colors flex items-center gap-1">
+                <span>⚡ Test Key</span>
+              </button>
+            </div>
             <input type="password" id="setting-gemini-key" placeholder="AIzaSy... (Leave empty to use Local Engine)" class="w-full bg-obsidian-950 border border-obsidian-800 rounded-md px-3 py-2 text-xs text-zinc-200 focus:outline-none">
+            <div id="gemini-test-result" class="text-[11px] mt-1.5 hidden"></div>
+          </div>
+        </div>
+
+        <!-- Online Mobile Access -->
+        <div class="bg-obsidian-900 border border-obsidian-800 rounded-xl p-5 space-y-3">
+          <h3 class="text-xs font-semibold uppercase tracking-wider text-zinc-300">Online Mobile Access (Anywhere / 4G / 5G)</h3>
+          <p class="text-xs text-zinc-400 leading-relaxed">
+            Use YouTube Recall on your Android phone anywhere in the world. Run <code class="text-amber-400 bg-obsidian-950 px-1.5 py-0.5 rounded border border-obsidian-800">start-online.bat</code> on your PC to generate a free secure HTTPS tunnel, then paste the URL into your Android app.
+          </p>
+          <div class="flex items-center gap-2 pt-1">
+            <button onclick="copyCurrentOrigin()" type="button" class="px-3 py-1.5 rounded-md bg-obsidian-950 hover:bg-obsidian-800 border border-obsidian-800 text-xs text-zinc-300 font-medium transition-colors">
+              📋 Copy Current Server URL
+            </button>
+            <span id="copy-url-toast" class="text-[11px] text-emerald-400 hidden">✓ Copied to clipboard!</span>
           </div>
         </div>
 
