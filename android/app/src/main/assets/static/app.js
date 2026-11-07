@@ -12,7 +12,7 @@ function getServerBaseUrl() {
     try {
       const b = window.AndroidBridge.getServerUrl();
       if (b && b.trim()) base = b.trim();
-    } catch (e) {}
+    } catch (e) { }
   }
   if (!base) {
     const stored = localStorage.getItem("recall_server_url");
@@ -58,7 +58,7 @@ function getLocalVideos() {
 function saveLocalVideos(videos) {
   try {
     localStorage.setItem(LOCAL_VIDEOS_KEY, JSON.stringify(videos));
-  } catch (e) {}
+  } catch (e) { }
 }
 
 function getLocalFlashcards() {
@@ -73,7 +73,7 @@ function getLocalFlashcards() {
 function saveLocalFlashcards(cards) {
   try {
     localStorage.setItem(LOCAL_FLASHCARDS_KEY, JSON.stringify(cards));
-  } catch (e) {}
+  } catch (e) { }
 }
 
 function extractYouTubeVideoId(urlOrId) {
@@ -117,9 +117,9 @@ async function distillVideoOnDevice(videoId) {
 
   showToastNotification("⚡ Synthesizing smart transcript & flashcards...", "info", 5000);
 
-  // 2. Resolve Gemini API Key (stored in device localStorage or settings field)
+  // 2. Resolve Gemini API Key (stored in localStorage or settings)
   const geminiKey = localStorage.getItem("recall_gemini_api_key") ||
-                    (document.getElementById("setting-gemini-key") ? document.getElementById("setting-gemini-key").value.trim() : "");
+    (document.getElementById("setting-gemini-key") ? document.getElementById("setting-gemini-key").value.trim() : "");
 
   let result = null;
   const candidateModels = ["gemini-3.8-flash", "gemini-3.5-flash", "gemini-3.5-flash-lite", "gemini-flash-lite-latest"];
@@ -301,7 +301,7 @@ function showToastNotification(message, type = "info", durationMs = 3500) {
 
   const toast = document.createElement("div");
   toast.className = `app-toast toast-${type}`;
-  
+
   let iconName = "info";
   if (type === "success") iconName = "check-circle";
   if (type === "error") iconName = "alert-circle";
@@ -389,7 +389,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Register PWA Service Worker for Mobile & Offline Support
   if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.register("/sw.js").catch(() => {});
+    navigator.serviceWorker.register("/sw.js").catch(() => { });
   }
 
   // Realtime auto-refresh when tab gains focus
@@ -455,6 +455,9 @@ function switchTab(tab) {
     renderReaderView(currentViewingVideo);
   } else if (tab === "library") {
     loadVideos();
+  } else if (tab === "settings") {
+    loadSettings();
+    if (window.lucide) lucide.createIcons();
   }
 }
 
@@ -475,7 +478,7 @@ async function loadStats() {
       if (vidRes.ok && statRes.ok) {
         const vids = await vidRes.json();
         const stats = await statRes.json();
-        
+
         // Merge local videos and local flashcards count into metrics
         const combinedStats = {
           total_videos: vids.length + localList.length,
@@ -810,7 +813,7 @@ function renderReaderView(video) {
 
 function renderTranscriptSections(sections, videoId) {
   const container = document.getElementById("smart-transcript-sections");
-  
+
   if (!sections || sections.length === 0) {
     container.innerHTML = `
       <div class="p-6 text-center text-zinc-500 text-xs font-mono">
@@ -870,7 +873,7 @@ function renderTranscriptSections(sections, videoId) {
 function filterTranscriptSections() {
   const query = document.getElementById("transcript-filter").value.toLowerCase().trim();
   const cards = document.querySelectorAll(".transcript-section-card");
-  
+
   cards.forEach(card => {
     const text = card.getAttribute("data-text") || "";
     if (!query || text.includes(query)) {
@@ -885,7 +888,7 @@ function filterTranscriptSections() {
 function copyCrispPoints() {
   if (!currentViewingVideo) return;
   const sections = currentViewingVideo.smart_transcript || currentViewingVideo.topic_notes || [];
-  
+
   let out = `# ${currentViewingVideo.title}\n\n`;
   out += `## Executive Takeaways:\n`;
   (currentViewingVideo.summary_bullets || []).forEach(b => out += `- ${b}\n`);
@@ -911,7 +914,7 @@ function copyCrispPoints() {
 function copyFullTranscript() {
   if (!currentViewingVideo) return;
   const sections = currentViewingVideo.smart_transcript || currentViewingVideo.topic_notes || [];
-  
+
   let out = `# ${currentViewingVideo.title}\n\n`;
   sections.forEach(s => {
     out += `[${s.timestamp_label || '00:00'}] ${s.title || 'Section'}\n`;
@@ -1092,32 +1095,22 @@ async function submitVideoIntake() {
 async function loadSettings() {
   const storedKey = localStorage.getItem("recall_gemini_api_key");
   const geminiEl = document.getElementById("setting-gemini-key");
+  const statusBadge = document.getElementById("gemini-status-badge");
+
   if (storedKey && geminiEl) {
     geminiEl.value = storedKey;
+    if (statusBadge) {
+      statusBadge.textContent = "Key Configured";
+      statusBadge.className = "px-2.5 py-0.5 rounded-full text-[10px] font-mono bg-emerald-500/10 text-emerald-400 border border-emerald-500/20";
+    }
+  } else if (statusBadge) {
+    statusBadge.textContent = "Key Required";
+    statusBadge.className = "px-2.5 py-0.5 rounded-full text-[10px] font-mono bg-amber-500/10 text-amber-400 border border-amber-500/20";
   }
 
   const localList = getLocalVideos();
   const countEl = document.getElementById("local-storage-count");
   if (countEl) countEl.textContent = `${localList.length} notes saved`;
-
-  updateModeBadge();
-
-  if (!hasServerBackend()) return;
-
-  try {
-    const res = await fetch(apiUrl("/api/settings"));
-    if (!res.ok) return;
-    const data = await res.json();
-
-    const prov = document.getElementById("setting-provider");
-    if (prov) prov.value = data.DEFAULT_AI_PROVIDER || "gemini";
-    const obs = document.getElementById("setting-obsidian-path");
-    if (obs) obs.value = data.OBSIDIAN_VAULT_PATH || "";
-    const notEl = document.getElementById("setting-notion-db");
-    if (notEl) notEl.value = data.NOTION_DATABASE_ID || "";
-  } catch (e) {
-    console.warn("Could not load server settings (using local):", e);
-  }
 }
 
 async function saveAndTestGeminiKey() {
@@ -1179,12 +1172,17 @@ async function saveAndTestGeminiKey() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ settings: { GEMINI_API_KEY: key, DEFAULT_AI_PROVIDER: "gemini" } })
       });
-    } catch (e) {}
+    } catch (e) { }
   }
 
   if (testBtn) testBtn.disabled = false;
 
   if (connectedModel) {
+    const statusBadge = document.getElementById("gemini-status-badge");
+    if (statusBadge) {
+      statusBadge.textContent = "Key Configured";
+      statusBadge.className = "px-2.5 py-0.5 rounded-full text-[10px] font-mono bg-emerald-500/10 text-emerald-400 border border-emerald-500/20";
+    }
     if (resultEl) {
       resultEl.className = "text-[11px] mt-2 text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 p-2.5 rounded-lg font-mono font-medium";
       resultEl.innerHTML = `✓ Connected to <b>${connectedModel}</b>! Standalone transcription is active and ready.`;
@@ -1404,7 +1402,7 @@ async function startFlashcardSession(filterVideoId = null) {
 async function loadAllCardsSession() {
   const statusChip = document.getElementById("practice-status-chip");
   if (statusChip) statusChip.textContent = "All Cards Review";
-  
+
   let cards = [];
   let loadedFromServer = false;
 
@@ -1415,7 +1413,7 @@ async function loadAllCardsSession() {
         cards = await res.json();
         loadedFromServer = true;
       }
-    } catch (e) {}
+    } catch (e) { }
   }
 
   if (!loadedFromServer) {
@@ -1464,7 +1462,7 @@ function renderCurrentCard() {
   const tsLabel = document.getElementById("card-ts-label");
   const tsSeconds = card.timestamp_seconds || 0;
   const label = card.timestamp_label || "00:00";
-  
+
   if (tsLabel) tsLabel.textContent = label;
   if (jumpBtn) {
     const vId = card.video ? card.video.video_id : (currentViewingVideo ? currentViewingVideo.video_id : "");
@@ -1710,7 +1708,7 @@ function setAppMode(mode) {
   if (mode === "standalone") {
     localStorage.setItem("recall_server_url", "standalone");
     if (window.AndroidBridge && typeof window.AndroidBridge.setServerUrl === "function") {
-      try { window.AndroidBridge.setServerUrl(""); } catch(e){}
+      try { window.AndroidBridge.setServerUrl(""); } catch (e) { }
     }
     const input = document.getElementById("setting-server-url");
     if (input) input.value = "standalone";
@@ -1726,7 +1724,7 @@ function setAppMode(mode) {
     const defaultLan = "http://192.168.1.4:8000";
     localStorage.setItem("recall_server_url", defaultLan);
     if (window.AndroidBridge && typeof window.AndroidBridge.setServerUrl === "function") {
-      try { window.AndroidBridge.setServerUrl(defaultLan); } catch(e){}
+      try { window.AndroidBridge.setServerUrl(defaultLan); } catch (e) { }
     }
     const input = document.getElementById("setting-server-url");
     if (input) input.value = defaultLan;
@@ -1741,7 +1739,7 @@ function applyServerUrlConfig() {
   const val = input.value.trim();
   localStorage.setItem("recall_server_url", val);
   if (window.AndroidBridge && typeof window.AndroidBridge.setServerUrl === "function") {
-    try { window.AndroidBridge.setServerUrl(val); } catch(e){}
+    try { window.AndroidBridge.setServerUrl(val); } catch (e) { }
   }
   showToastNotification(`Server configuration saved: ${val || 'Standalone'}`, "success");
   updateModeBadge();

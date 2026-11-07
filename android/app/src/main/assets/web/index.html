@@ -312,19 +312,22 @@
             With your Gemini API Key saved, YouTube Recall contacts Google's Gemini API directly from your phone to retrieve transcripts and distill structured chapter notes. No laptop or desktop server is needed!
           </p>
 
-          <div class="space-y-2">
-            <label class="block text-xs font-medium text-zinc-300">Gemini API Key</label>
-            <div class="relative">
-              <input type="password" id="setting-gemini-key" placeholder="Paste your Gemini API key (e.g. AIzaSy...)" class="w-full bg-obsidian-950 border border-obsidian-800 rounded-lg pl-3 pr-10 py-2.5 text-xs text-zinc-200 font-mono focus:outline-none focus:border-amber-500/50">
-              <button type="button" onclick="togglePasswordVisibility('setting-gemini-key', this)" class="absolute right-2.5 top-2.5 text-zinc-500 hover:text-zinc-300 transition-colors p-0.5">
-                <i data-lucide="eye" class="w-4 h-4"></i>
-              </button>
+          <div class="space-y-3">
+            <div>
+              <label class="block text-xs font-medium text-zinc-300 mb-1.5">Gemini API Key</label>
+              <div class="relative">
+                <input type="password" id="setting-gemini-key" placeholder="Paste your Gemini API key (e.g. AIzaSy...)" class="w-full bg-obsidian-950 border border-obsidian-800 rounded-lg pl-3 pr-10 py-2.5 text-xs text-zinc-200 font-mono focus:outline-none focus:border-amber-500/50">
+                <button type="button" onclick="togglePasswordVisibility('setting-gemini-key', this)" class="absolute right-2.5 top-2.5 text-zinc-500 hover:text-zinc-300 transition-colors p-0.5">
+                  <i data-lucide="eye" class="w-4 h-4"></i>
+                </button>
+              </div>
             </div>
-            <div class="flex items-center justify-between pt-1">
-              <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" class="text-[11px] text-amber-400/90 hover:text-amber-300 underline underline-offset-2 flex items-center gap-1">
+
+            <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-1">
+              <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" class="text-xs text-amber-400 hover:text-amber-300 underline underline-offset-2 flex items-center gap-1">
                 <span>Get a free Gemini API key on Google AI Studio ↗</span>
               </a>
-              <button onclick="saveAndTestGeminiKey()" id="btn-test-gemini" type="button" class="px-3 py-1.5 rounded-md bg-amber-500 hover:bg-amber-400 text-zinc-950 text-xs font-semibold transition-colors flex items-center gap-1 active:scale-95 shadow-sm">
+              <button onclick="saveAndTestGeminiKey()" id="btn-test-gemini" type="button" class="px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-zinc-950 text-xs font-bold transition-colors flex items-center justify-center gap-1.5 active:scale-95 shadow-sm">
                 <i data-lucide="zap" class="w-3.5 h-3.5 stroke-[2.5]"></i>
                 <span>Save &amp; Test Key</span>
               </button>
@@ -346,31 +349,10 @@
             All your captured summaries and notes are stored locally in your phone or browser storage.
           </p>
           <div class="flex items-center gap-2 pt-1">
-            <button onclick="clearLocalStorageLibrary()" type="button" class="px-3 py-1.5 rounded-md bg-obsidian-850 hover:bg-rose-950/40 border border-obsidian-750 hover:border-rose-500/40 text-xs text-zinc-400 hover:text-rose-400 font-medium transition-colors active:scale-95">
-              Clear Local Library
+            <button onclick="clearLocalStorageLibrary()" type="button" class="px-3.5 py-2 rounded-lg bg-obsidian-850 hover:bg-rose-950/40 border border-obsidian-750 hover:border-rose-500/40 text-xs text-zinc-400 hover:text-rose-400 font-medium transition-colors active:scale-95 flex items-center gap-1.5">
+              <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+              <span>Clear Local Library</span>
             </button>
-          </div>
-        </div>
-
-        <!-- Android Application Card -->
-        <div class="bg-obsidian-900 border border-obsidian-800 rounded-xl p-5 space-y-3">
-          <div class="flex items-center justify-between">
-            <h3 class="text-xs font-semibold uppercase tracking-wider text-zinc-300 flex items-center gap-2">
-              <i data-lucide="smartphone" class="w-4 h-4 text-amber-400"></i>
-              Android Mobile App (APK)
-            </h3>
-            <span class="px-2.5 py-0.5 rounded-full text-[10px] font-mono bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-              v1.0.0
-            </span>
-          </div>
-          <p class="text-xs text-zinc-400 leading-relaxed">
-            Install the native Android app. When watching any video on the YouTube app, tap <strong>Share → YouTube Recall</strong> to instantly capture and transcribe it.
-          </p>
-          <div class="pt-1">
-            <a href="/api/download/android-apk" download="youtube-recall.apk" class="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-zinc-950 font-semibold text-xs transition-colors shadow-sm active:scale-95">
-              <i data-lucide="download" class="w-3.5 h-3.5 stroke-[2.5]"></i>
-              <span>Download Android APK</span>
-            </a>
           </div>
         </div>
       </div>
