@@ -256,14 +256,26 @@ class MainActivity : AppCompatActivity() {
         val type = intent.type
 
         if (Intent.ACTION_SEND == action && type != null && "text/plain" == type) {
-            val sharedText = intent.getStringExtra(Intent.EXTRA_TEXT) ?: ""
+            var sharedText = intent.getStringExtra(Intent.EXTRA_TEXT) ?: ""
+            if (sharedText.isEmpty()) {
+                sharedText = intent.getStringExtra(Intent.EXTRA_SUBJECT) ?: ""
+            }
+            if (sharedText.isEmpty() && intent.clipData != null && intent.clipData!!.itemCount > 0) {
+                sharedText = intent.clipData!!.getItemAt(0).text?.toString() ?: ""
+            }
             val videoId = extractYouTubeVideoId(sharedText)
             if (videoId != null) {
                 pendingSharedVideoId = videoId
                 Toast.makeText(this, "Capturing YouTube Video into Recall...", Toast.LENGTH_SHORT).show()
                 val base = if (activeServerUrl.isNotEmpty()) activeServerUrl else APP_ASSET_URL
                 val targetUrl = "$base/?v=$videoId&text=${Uri.encode(sharedText)}"
-                binding.webView.loadUrl(targetUrl)
+
+                val script = "if (window.autoIntakeSharedVideo) { window.autoIntakeSharedVideo('$videoId'); } else if (window.openReaderForVideo) { window.openReaderForVideo('$videoId'); }"
+                binding.webView.evaluateJavascript(script) { res ->
+                    if (res == null || res == "null") {
+                        binding.webView.loadUrl(targetUrl)
+                    }
+                }
             }
         } else if (Intent.ACTION_VIEW == action) {
             val dataUri = intent.dataString ?: ""
@@ -272,7 +284,13 @@ class MainActivity : AppCompatActivity() {
                 pendingSharedVideoId = videoId
                 val base = if (activeServerUrl.isNotEmpty()) activeServerUrl else APP_ASSET_URL
                 val targetUrl = "$base/?v=$videoId"
-                binding.webView.loadUrl(targetUrl)
+
+                val script = "if (window.autoIntakeSharedVideo) { window.autoIntakeSharedVideo('$videoId'); } else if (window.openReaderForVideo) { window.openReaderForVideo('$videoId'); }"
+                binding.webView.evaluateJavascript(script) { res ->
+                    if (res == null || res == "null") {
+                        binding.webView.loadUrl(targetUrl)
+                    }
+                }
             }
         }
     }

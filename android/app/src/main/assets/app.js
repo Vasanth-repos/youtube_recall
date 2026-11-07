@@ -382,6 +382,11 @@ document.addEventListener("DOMContentLoaded", () => {
   checkAutoCaptureStatus();
   handleIncomingShareTarget();
 
+  if (sessionStorage.getItem("recall_dismiss_share_tip")) {
+    const banner = document.getElementById("banner-share-tip");
+    if (banner) banner.classList.add("hidden");
+  }
+
   // Register PWA Service Worker for Mobile & Offline Support
   if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("/sw.js").catch(() => {});
@@ -1794,6 +1799,12 @@ function toggleAutoCapture(enabled) {
     window.AndroidBridge.setAutoCaptureEnabled(enabled);
   }
   checkAutoCaptureStatus();
+}
+
+function dismissShareTipBanner() {
+  sessionStorage.setItem("recall_dismiss_share_tip", "true");
+  const banner = document.getElementById("banner-share-tip");
+  if (banner) banner.classList.add("hidden");
 }
 
 function dismissAutoCaptureBanner() {
