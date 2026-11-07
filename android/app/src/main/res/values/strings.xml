@@ -1,9 +1,3 @@
 <resources>
     <string name="app_name">YouTube Recall</string>
-    <string name="server_url_dialog_title">Configure Server Address</string>
-    <string name="server_url_hint">http://192.168.1.4:8000</string>
-    <string name="server_url_help">Enter the IP address of your YouTube Recall backend server (e.g. http://192.168.1.4:8000 or http://10.0.2.2:8000 for emulator).</string>
-    <string name="retry">Retry Connection</string>
-    <string name="offline_msg">Backend server not reachable at %s. Ensure the Python server is running and your device is on the same Wi-Fi.</string>
 </resources>
-

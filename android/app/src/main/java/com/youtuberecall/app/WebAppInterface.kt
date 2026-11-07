@@ -27,26 +27,17 @@ class WebAppInterface(
 
     @JavascriptInterface
     fun getServerUrl(): String {
-        return prefs.getString("server_url", "") ?: ""
+        return "" // Pure Standalone Mobile Engine
     }
 
     @JavascriptInterface
     fun setServerUrl(url: String) {
-        var cleanUrl = url.trim()
-        if (!cleanUrl.startsWith("http://") && !cleanUrl.startsWith("https://")) {
-            cleanUrl = "http://$cleanUrl"
-        }
-        if (cleanUrl.endsWith("/")) {
-            cleanUrl = cleanUrl.substring(0, cleanUrl.length - 1)
-        }
-        prefs.edit().putString("server_url", cleanUrl).apply()
+        // Pure Standalone Mobile Engine - No server required
     }
 
     @JavascriptInterface
     fun openServerDialog() {
-        activity.runOnUiThread {
-            activity.showServerUrlDialog()
-        }
+        // Pure Standalone Mobile Engine - No server dialog
     }
 
     @JavascriptInterface

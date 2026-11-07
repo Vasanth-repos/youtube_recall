@@ -1,56 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/obsidian_canvas">
-
-    <!-- Top Native Header Bar -->
-    <LinearLayout
-        android:id="@+id/topBar"
-        android:layout_width="match_parent"
-        android:layout_height="52dp"
-        android:background="@color/obsidian_surface"
-        android:gravity="center_vertical"
-        android:orientation="horizontal"
-        android:paddingStart="16dp"
-        android:paddingEnd="16dp"
-        app:layout_constraintTop_toTopOf="parent">
-
-        <TextView
-            android:id="@+id/logoText"
-            android:layout_width="32dp"
-            android:layout_height="32dp"
-            android:background="@drawable/bg_logo_circle"
-            android:gravity="center"
-            android:text="R"
-            android:textColor="@color/amber_accent"
-            android:textSize="18sp"
-            android:textStyle="bold" />
-
-        <TextView
-            android:id="@+id/appTitle"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="12dp"
-            android:layout_weight="1"
-            android:text="YouTube Recall"
-            android:textColor="@color/zinc_primary"
-            android:textSize="16sp"
-            android:textStyle="bold" />
-
-        <!-- Server IP Settings Button -->
-        <ImageButton
-            android:id="@+id/btnServerSettings"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:contentDescription="Server Settings"
-            android:padding="8dp"
-            android:src="@android:drawable/ic_menu_preferences"
-            app:tint="@color/amber_accent" />
-    </LinearLayout>
 
     <!-- Top Loading Progress Bar -->
     <ProgressBar
@@ -62,7 +15,7 @@
         android:max="100"
         android:progressDrawable="@drawable/progress_amber"
         android:visibility="gone"
-        app:layout_constraintTop_toBottomOf="@id/topBar" />
+        app:layout_constraintTop_toTopOf="parent" />
 
     <!-- Swipe-to-Refresh Container -->
     <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
@@ -80,63 +33,4 @@
             android:background="@color/obsidian_canvas" />
     </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
 
-    <!-- Offline Reconnection State Container -->
-    <LinearLayout
-        android:id="@+id/offlineContainer"
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:background="@color/obsidian_canvas"
-        android:gravity="center"
-        android:orientation="vertical"
-        android:padding="32dp"
-        android:visibility="gone"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/topBar">
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="📡"
-            android:textSize="48sp" />
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:text="Connecting to Backend Server"
-            android:textColor="@color/zinc_primary"
-            android:textSize="18sp"
-            android:textStyle="bold" />
-
-        <TextView
-            android:id="@+id/tvOfflineMessage"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:gravity="center"
-            android:text="@string/server_url_help"
-            android:textColor="@color/zinc_muted"
-            android:textSize="13sp" />
-
-        <Button
-            android:id="@+id/btnRetry"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="20dp"
-            android:backgroundTint="@color/amber_accent"
-            android:text="@string/retry"
-            android:textColor="#000000"
-            android:textStyle="bold" />
-
-        <Button
-            android:id="@+id/btnChangeIp"
-            style="@style/Widget.MaterialComponents.Button.TextButton"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:text="Configure Server IP"
-            android:textColor="@color/amber_accent" />
-    </LinearLayout>
-
 </androidx.constraintlayout.widget.ConstraintLayout>
-
