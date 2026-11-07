@@ -117,12 +117,12 @@ async function distillVideoOnDevice(videoId) {
 
   showToastNotification("⚡ Synthesizing smart transcript & flashcards...", "info", 5000);
 
-  // 2. Resolve Gemini API Key (stored or settings)
+  // 2. Resolve Gemini API Key (stored in device localStorage or settings field)
   const geminiKey = localStorage.getItem("recall_gemini_api_key") ||
                     (document.getElementById("setting-gemini-key") ? document.getElementById("setting-gemini-key").value.trim() : "");
 
   let result = null;
-  const candidateModels = ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite", "gemini-3.8-flash", "gemini-3.5-flash", "gemini-flash-lite-latest"];
+  const candidateModels = ["gemini-3.8-flash", "gemini-3.5-flash", "gemini-3.5-flash-lite", "gemini-flash-lite-latest"];
 
   if (geminiKey) {
     const prompt = `You are an expert technical educator and editor.
@@ -433,10 +433,8 @@ async function handleIncomingShareTarget() {
 }
 
 // Navigation Tabs (Syncs Desktop Top Nav and Mobile Bottom Nav)
-let activePracticeVideoId = null;
-
 function switchTab(tab) {
-  const tabs = ["library", "reader", "practice", "settings"];
+  const tabs = ["library", "reader", "settings"];
   tabs.forEach(t => {
     const el = document.getElementById(`tab-${t}`);
     const deskBtn = document.getElementById(`nav-${t}-btn`);
@@ -457,8 +455,6 @@ function switchTab(tab) {
     renderReaderView(currentViewingVideo);
   } else if (tab === "library") {
     loadVideos();
-  } else if (tab === "practice") {
-    startFlashcardSession(activePracticeVideoId);
   }
 }
 
@@ -1014,6 +1010,12 @@ async function submitVideoIntake() {
     return;
   }
 
+  const vidId = extractYouTubeVideoId(url) || (url.length === 11 ? url : null);
+  if (!vidId) {
+    showToastNotification("Please enter a valid YouTube video link or 11-char ID", "error");
+    return;
+  }
+
   const submitBtn = document.getElementById("intake-submit-btn");
   const statusBox = document.getElementById("intake-status");
   const statusText = document.getElementById("intake-status-text");
@@ -1023,54 +1025,81 @@ async function submitVideoIntake() {
     submitBtn.classList.add("opacity-50");
   }
   if (statusBox) statusBox.classList.remove("hidden");
-  if (statusText) statusText.textContent = "Transcribing & filtering conversational noise...";
+  if (statusText) statusText.textContent = "Transcribing & distilling via Gemini...";
 
-  try {
-    const res = await fetch(apiUrl("/api/videos/intake"), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        video_url_or_id: url,
-        watch_time_seconds: 300,
-        watch_percent: 100,
-        force_process: force
-      })
-    });
+  let succeeded = false;
+  if (hasServerBackend()) {
+    try {
+      const res = await fetch(apiUrl("/api/videos/intake"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          video_url_or_id: url,
+          watch_time_seconds: 300,
+          watch_percent: 100,
+          force_process: force
+        })
+      });
 
-    const data = await res.json();
-    if (!res.ok) {
-      throw new Error(data.detail || "Video transcription failed");
+      const data = await res.json();
+      if (res.ok && data.video_id) {
+        if (statusText) statusText.textContent = "Smart transcript distilled successfully!";
+        showToastNotification("Video distilled into smart transcript!", "success");
+        setTimeout(() => {
+          closeCaptureModal();
+          if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.classList.remove("opacity-50");
+          }
+          if (urlEl) urlEl.value = "";
+          loadVideos().then(() => {
+            openReaderForVideo(data.video_id);
+          });
+        }, 600);
+        succeeded = true;
+      }
+    } catch (e) {
+      console.warn("Server intake failed or unreachable, switching to on-device standalone distillation:", e);
     }
+  }
 
-    if (statusText) statusText.textContent = "Smart transcript distilled successfully!";
-    showToastNotification("Video distilled into smart transcript!", "success");
-    setTimeout(() => {
+  if (!succeeded) {
+    // Pure Standalone On-Device Distillation via Google Gemini API
+    try {
+      if (statusText) statusText.textContent = "Transcribing directly on device with Gemini...";
+      const newVideo = await distillVideoOnDevice(vidId);
       closeCaptureModal();
       if (submitBtn) {
         submitBtn.disabled = false;
         submitBtn.classList.remove("opacity-50");
       }
       if (urlEl) urlEl.value = "";
-      loadVideos().then(() => {
-        openReaderForVideo(data.video_id);
-      });
-    }, 600);
-
-  } catch (e) {
-    showToastNotification("Transcription Notice: " + e.message, "error");
-    if (submitBtn) {
-      submitBtn.disabled = false;
-      submitBtn.classList.remove("opacity-50");
+      if (newVideo) {
+        openReaderForVideo(newVideo.video_id || newVideo.id);
+      }
+    } catch (err) {
+      showToastNotification("Notice: " + err.message, "error");
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.classList.remove("opacity-50");
+      }
+      if (statusBox) statusBox.classList.add("hidden");
     }
-    if (statusBox) statusBox.classList.add("hidden");
   }
 }
 
-// Settings
+// Settings & Standalone Mode
 async function loadSettings() {
   const storedKey = localStorage.getItem("recall_gemini_api_key");
   const geminiEl = document.getElementById("setting-gemini-key");
-  if (storedKey && geminiEl) geminiEl.value = storedKey;
+  if (storedKey && geminiEl) {
+    geminiEl.value = storedKey;
+  }
+
+  const localList = getLocalVideos();
+  const countEl = document.getElementById("local-storage-count");
+  if (countEl) countEl.textContent = `${localList.length} notes saved`;
+
   updateModeBadge();
 
   if (!hasServerBackend()) return;
@@ -1081,13 +1110,104 @@ async function loadSettings() {
     const data = await res.json();
 
     const prov = document.getElementById("setting-provider");
-    if (prov) prov.value = data.DEFAULT_AI_PROVIDER || "local_offline";
+    if (prov) prov.value = data.DEFAULT_AI_PROVIDER || "gemini";
     const obs = document.getElementById("setting-obsidian-path");
     if (obs) obs.value = data.OBSIDIAN_VAULT_PATH || "";
     const notEl = document.getElementById("setting-notion-db");
     if (notEl) notEl.value = data.NOTION_DATABASE_ID || "";
   } catch (e) {
     console.warn("Could not load server settings (using local):", e);
+  }
+}
+
+async function saveAndTestGeminiKey() {
+  const geminiEl = document.getElementById("setting-gemini-key");
+  const resultEl = document.getElementById("gemini-test-result");
+  const testBtn = document.getElementById("btn-test-gemini");
+  const key = geminiEl ? geminiEl.value.trim() : "";
+
+  if (!key) {
+    showToastNotification("Please enter a Gemini API Key", "error");
+    if (geminiEl) geminiEl.focus();
+    return;
+  }
+
+  // Save to localStorage immediately
+  localStorage.setItem("recall_gemini_api_key", key);
+
+  if (resultEl) {
+    resultEl.classList.remove("hidden", "text-emerald-400", "text-rose-400", "bg-emerald-500/10", "bg-rose-500/10", "border-emerald-500/20", "border-rose-500/20");
+    resultEl.classList.add("text-amber-400", "bg-amber-500/10", "border-amber-500/20");
+    resultEl.innerHTML = "<span>⏳ Testing key directly against Google Gemini Cloud...</span>";
+  }
+  if (testBtn) testBtn.disabled = true;
+
+  // Direct client-side test to Google Gemini API
+  const candidateModels = ["gemini-3.8-flash", "gemini-3.5-flash", "gemini-3.5-flash-lite", "gemini-flash-lite-latest"];
+  let connectedModel = null;
+  let lastError = null;
+
+  for (const m of candidateModels) {
+    try {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent?key=${key}`;
+      const payload = {
+        contents: [{ parts: [{ text: "Respond in JSON: {\"status\":\"ok\"}" }] }],
+        generationConfig: { responseMimeType: "application/json" }
+      };
+      const resp = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      if (resp.ok) {
+        connectedModel = m;
+        break;
+      } else {
+        const errJson = await resp.json().catch(() => ({}));
+        lastError = errJson?.error?.message || `HTTP ${resp.status}`;
+      }
+    } catch (e) {
+      lastError = e.message;
+    }
+  }
+
+  // If server backend is connected, also save it to server
+  if (hasServerBackend()) {
+    try {
+      await fetch(apiUrl("/api/settings"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ settings: { GEMINI_API_KEY: key, DEFAULT_AI_PROVIDER: "gemini" } })
+      });
+    } catch (e) {}
+  }
+
+  if (testBtn) testBtn.disabled = false;
+
+  if (connectedModel) {
+    if (resultEl) {
+      resultEl.className = "text-[11px] mt-2 text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 p-2.5 rounded-lg font-mono font-medium";
+      resultEl.innerHTML = `✓ Connected to <b>${connectedModel}</b>! Standalone transcription is active and ready.`;
+    }
+    showToastNotification(`✓ Gemini API Key active (${connectedModel})`, "success", 4000);
+  } else {
+    if (resultEl) {
+      resultEl.className = "text-[11px] mt-2 text-rose-400 bg-rose-500/10 border border-rose-500/20 p-2.5 rounded-lg font-mono";
+      resultEl.innerHTML = `⚠️ Gemini validation notice: ${lastError || "Could not connect to Gemini models with this key."}`;
+    }
+    showToastNotification("Could not validate key with Google Gemini", "error");
+  }
+}
+
+function clearLocalStorageLibrary() {
+  if (confirm("Are you sure you want to clear your locally saved study notes on this device?")) {
+    localStorage.removeItem(LOCAL_VIDEOS_KEY);
+    localStorage.removeItem(LOCAL_FLASHCARDS_KEY);
+    localStorage.removeItem("recall_local_review_count");
+    loadVideos();
+    loadStats();
+    loadSettings();
+    showToastNotification("Local device library cleared", "info");
   }
 }
 
@@ -1137,44 +1257,7 @@ async function saveSettings() {
 }
 
 async function testGeminiKey() {
-  const geminiEl = document.getElementById("setting-gemini-key");
-  const resultEl = document.getElementById("gemini-test-result");
-  const testBtn = document.getElementById("btn-test-gemini");
-  const key = geminiEl ? geminiEl.value.trim() : "";
-
-  if (resultEl) {
-    resultEl.classList.remove("hidden", "text-emerald-400", "text-rose-400");
-    resultEl.classList.add("text-amber-400");
-    resultEl.innerHTML = "<span>⏳ Testing key against Google Gemini Cloud...</span>";
-  }
-  if (testBtn) testBtn.disabled = true;
-
-  try {
-    const res = await fetch(apiUrl("/api/settings/test-gemini"), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ api_key: key })
-    });
-    const data = await res.json();
-    if (data.valid) {
-      if (resultEl) {
-        resultEl.className = "text-[11px] mt-1.5 text-emerald-400 font-medium";
-        resultEl.innerHTML = `✓ Connected to <b>${data.active_model}</b>! Ready for high-speed online synthesis.`;
-      }
-    } else {
-      if (resultEl) {
-        resultEl.className = "text-[11px] mt-1.5 text-rose-400";
-        resultEl.innerHTML = `⚠️ ${data.error || "Failed to validate Gemini key."}`;
-      }
-    }
-  } catch (err) {
-    if (resultEl) {
-      resultEl.className = "text-[11px] mt-1.5 text-rose-400";
-      resultEl.innerHTML = `⚠️ Network error: ${err.message}`;
-    }
-  } finally {
-    if (testBtn) testBtn.disabled = false;
-  }
+  return saveAndTestGeminiKey();
 }
 
 function copyCurrentOrigin() {
@@ -1210,7 +1293,7 @@ async function loadAccountStatus() {
       if (navStatus) navStatus.classList.remove("hidden");
       if (navName) navName.textContent = data.account_email || data.account_name || "YouTube Linked";
       if (settingsName) settingsName.textContent = data.account_name || "YouTube Account";
-      if (settingsEmail) settingsEmail.textContent = data.account_email || "vasanthabalanb4@gmail.com";
+      if (settingsEmail) settingsEmail.textContent = data.account_email || "";
       if (settingsBadge) settingsBadge.textContent = data.linked_method === "google_oauth" ? "Google OAuth Connected" : "Account Synced";
       if (settingsSyncStatus) {
         settingsSyncStatus.textContent = data.last_synced_at ? `Last synced: ${data.last_synced_at}` : "Continuous background capture active";

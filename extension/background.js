@@ -372,8 +372,8 @@ async function syncYouTubeHistory(maxResults = 30) {
 
     const resp = await postToBackend("/api/videos/sync-history", {
       items: combined,
-      account_name: accountInfo.account_name || "Vasanthabalan",
-      account_email: accountInfo.account_email || "vasanthabalanb4@gmail.com",
+      account_name: accountInfo.account_name || "YouTube User",
+      account_email: accountInfo.account_email || "",
       avatar_url: accountInfo.avatar_url || ""
     });
 
@@ -465,8 +465,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       chrome.storage.local.set({ yt_account_info: request.account_info }, () => {
         if (chrome.runtime.lastError) {}
         postToBackend("/api/youtube/browser-account", {
-          account_name: request.account_info.account_name || "Vasanthabalan",
-          account_email: request.account_info.account_email || "vasanthabalanb4@gmail.com",
+          account_name: request.account_info.account_name || "YouTube User",
+          account_email: request.account_info.account_email || "",
           avatar_url: request.account_info.avatar_url || "",
           channel_id: request.account_info.channel_id || "",
           linked_method: "browser_extension"

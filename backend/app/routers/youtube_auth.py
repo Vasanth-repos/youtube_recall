@@ -22,17 +22,17 @@ def utcnow():
 def get_youtube_account_status(db: Session = Depends(get_db)):
     """Returns currently linked YouTube account details, connection method, and sync state."""
     record = db.query(AppSetting).filter(AppSetting.key == "YOUTUBE_ACCOUNT_INFO").first()
-    default_email = settings.YOUTUBE_ACCOUNT_EMAIL or "vasanthabalanb4@gmail.com"
-    default_name = default_email.split("@")[0].capitalize()
+    default_email = settings.YOUTUBE_ACCOUNT_EMAIL or ""
+    default_name = default_email.split("@")[0].capitalize() if default_email else "YouTube User"
 
     if not record or not record.value:
         return YouTubeAccountInfo(
-            is_linked=True,
+            is_linked=False,
             account_name=default_name,
             account_email=default_email,
             avatar_url="",
             channel_id="",
-            linked_method="google_account_sync",
+            linked_method="standalone",
             last_synced_at=None
         )
     try:
@@ -52,8 +52,8 @@ def get_youtube_account_status(db: Session = Depends(get_db)):
 @router.post("/browser-account", response_model=YouTubeAccountInfo)
 def link_browser_account(payload: YouTubeAccountUpdateRequest, db: Session = Depends(get_db)):
     """Links YouTube account via Chrome Extension browser session detection."""
-    email = payload.account_email or settings.YOUTUBE_ACCOUNT_EMAIL or "vasanthabalanb4@gmail.com"
-    name = payload.account_name or email.split("@")[0].capitalize()
+    email = payload.account_email or settings.YOUTUBE_ACCOUNT_EMAIL or ""
+    name = payload.account_name or (email.split("@")[0].capitalize() if email else "YouTube User")
     acc_data = {
         "is_linked": True,
         "account_name": name,

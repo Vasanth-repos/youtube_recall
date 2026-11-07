@@ -183,7 +183,7 @@ class AIService:
     @classmethod
     def test_gemini_key(cls, api_key: str) -> Dict[str, Any]:
         """Validates a Gemini API key with live high-speed candidate models."""
-        candidate_models = ["gemini-flash-lite-latest", "gemini-3.5-flash-lite", "gemini-3.1-flash-lite"]
+        candidate_models = ["gemini-3.8-flash", "gemini-3.5-flash", "gemini-3.5-flash-lite", "gemini-flash-lite-latest"]
         for model in candidate_models:
             url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
             payload = {
@@ -288,11 +288,10 @@ class AIService:
     def _call_gemini(cls, prompt: str, api_key: str) -> Optional[Dict[str, Any]]:
         """Calls Google AI Studio / Gemini API using candidate models with automatic fallback."""
         candidate_models = [
-            "gemini-flash-lite-latest",
-            "gemini-3.5-flash-lite",
-            "gemini-3.1-flash-lite",
             "gemini-3.8-flash",
-            "gemini-3.5-flash"
+            "gemini-3.5-flash",
+            "gemini-3.5-flash-lite",
+            "gemini-flash-lite-latest"
         ]
         for model in candidate_models:
             url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"

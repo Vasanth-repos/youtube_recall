@@ -24,7 +24,7 @@ class AppConfig:
     OLLAMA_MODEL: str = os.getenv("OLLAMA_MODEL", "llama3")
 
     # YouTube / Google Account Linking
-    YOUTUBE_ACCOUNT_EMAIL: str = os.getenv("YOUTUBE_ACCOUNT_EMAIL", "vasanthabalanb4@gmail.com")
+    YOUTUBE_ACCOUNT_EMAIL: str = os.getenv("YOUTUBE_ACCOUNT_EMAIL", "")
     GOOGLE_CLIENT_ID: str = os.getenv("GOOGLE_CLIENT_ID", "")
     GOOGLE_CLIENT_SECRET: str = os.getenv("GOOGLE_CLIENT_SECRET", "")
     GOOGLE_REDIRECT_URI: str = os.getenv("GOOGLE_REDIRECT_URI", "http://localhost:8000/api/youtube/oauth-callback")

@@ -172,8 +172,8 @@ def sync_youtube_history(payload: YouTubeHistorySyncRequest, db: Session = Depen
     """
     # 1. Update linked account metadata if provided
     if payload.account_name or payload.account_email:
-        email = payload.account_email or settings.YOUTUBE_ACCOUNT_EMAIL or "vasanthabalanb4@gmail.com"
-        name = payload.account_name or email.split("@")[0].capitalize()
+        email = payload.account_email or settings.YOUTUBE_ACCOUNT_EMAIL or ""
+        name = payload.account_name or (email.split("@")[0].capitalize() if email else "User")
         acc_data = {
             "is_linked": True,
             "account_name": name,
