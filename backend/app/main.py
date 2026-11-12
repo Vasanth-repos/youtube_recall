@@ -56,6 +56,7 @@ if FRONTEND_DIR.exists():
     app.mount("/static", StaticFiles(directory=str(FRONTEND_DIR)), name="static")
 
     @app.get("/")
+    @app.head("/")
     def serve_frontend_root():
         index_file = FRONTEND_DIR / "index.html"
         if index_file.exists():

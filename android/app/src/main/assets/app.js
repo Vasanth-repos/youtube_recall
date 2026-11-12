@@ -91,6 +91,27 @@ function extractYouTubeVideoId(urlOrId) {
   return null;
 }
 
+function safeParseJson(text) {
+  if (!text) return null;
+  try {
+    return JSON.parse(text);
+  } catch (e) {}
+
+  let cleaned = text.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
+  try {
+    return JSON.parse(cleaned);
+  } catch (e) {}
+
+  const firstBrace = cleaned.indexOf("{");
+  const lastBrace = cleaned.lastIndexOf("}");
+  if (firstBrace !== -1 && lastBrace > firstBrace) {
+    try {
+      return JSON.parse(cleaned.substring(firstBrace, lastBrace + 1));
+    } catch (e) {}
+  }
+  return null;
+}
+
 // Client-Side Autonomous Intake Engine (Runs directly on Mobile without laptop!)
 async function distillVideoOnDevice(videoId) {
   showToastNotification("✨ Distilling on device: Fetching video details...", "info", 4500);
@@ -122,7 +143,7 @@ async function distillVideoOnDevice(videoId) {
     (document.getElementById("setting-gemini-key") ? document.getElementById("setting-gemini-key").value.trim() : "");
 
   let result = null;
-  const candidateModels = ["gemini-3.8-flash", "gemini-3.5-flash", "gemini-3.5-flash-lite", "gemini-flash-lite-latest"];
+  const candidateModels = ["gemini-flash-lite-latest", "gemini-3.5-flash-lite", "gemini-3.8-flash", "gemini-3.5-flash"];
 
   if (geminiKey) {
     const prompt = `You are an expert technical educator and editor.
@@ -166,8 +187,11 @@ Return ONLY valid JSON matching this schema.`;
           const gData = await gRes.json();
           const rawText = gData?.candidates?.[0]?.content?.parts?.[0]?.text;
           if (rawText) {
-            result = JSON.parse(rawText);
-            break;
+            const parsed = safeParseJson(rawText);
+            if (parsed && parsed.summary_bullets) {
+              result = parsed;
+              break;
+            }
           }
         }
       } catch (err) {
@@ -707,7 +731,7 @@ function renderVideosGrid() {
               <i data-lucide="book-open" class="w-3.5 h-3.5"></i>
               <span>Read</span>
             </button>
-            <button onclick="deleteVideoById(${v.id})" title="Delete" class="p-1 rounded-md hover:bg-obsidian-800 text-zinc-500 hover:text-rose-400 transition-colors">
+            <button onclick="deleteVideoById('${v.id}')" title="Delete" class="p-1 rounded-md hover:bg-obsidian-800 text-zinc-500 hover:text-rose-400 transition-colors">
               <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
             </button>
           </div>
@@ -884,8 +908,36 @@ function filterTranscriptSections() {
   });
 }
 
+async function safeCopyToClipboard(text) {
+  if (!text) return false;
+  if (navigator.clipboard && window.isSecureContext) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch (e) {
+      console.warn("navigator.clipboard failed, falling back to execCommand:", e);
+    }
+  }
+  try {
+    const textArea = document.createElement("textarea");
+    textArea.value = text;
+    textArea.style.position = "fixed";
+    textArea.style.top = "-9999px";
+    textArea.style.left = "-9999px";
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+    const successful = document.execCommand("copy");
+    document.body.removeChild(textArea);
+    if (successful) return true;
+  } catch (err) {
+    console.error("execCommand copy fallback failed:", err);
+  }
+  return false;
+}
+
 // Copy Actions
-function copyCrispPoints() {
+async function copyCrispPoints() {
   if (!currentViewingVideo) return;
   const sections = currentViewingVideo.smart_transcript || currentViewingVideo.topic_notes || [];
 
@@ -901,17 +953,20 @@ function copyCrispPoints() {
     out += `\n`;
   });
 
-  navigator.clipboard.writeText(out).then(() => {
+  const success = await safeCopyToClipboard(out);
+  if (success) {
     const btnText = document.getElementById("copy-points-text");
     if (btnText) {
       btnText.textContent = "✓ Copied!";
       setTimeout(() => btnText.textContent = "Copy Notes", 2000);
     }
     showToastNotification("Notes copied to clipboard", "success");
-  });
+  } else {
+    showToastNotification("Failed to copy notes", "error");
+  }
 }
 
-function copyFullTranscript() {
+async function copyFullTranscript() {
   if (!currentViewingVideo) return;
   const sections = currentViewingVideo.smart_transcript || currentViewingVideo.topic_notes || [];
 
@@ -925,14 +980,17 @@ function copyFullTranscript() {
     out += currentViewingVideo.transcript_clean;
   }
 
-  navigator.clipboard.writeText(out).then(() => {
+  const success = await safeCopyToClipboard(out);
+  if (success) {
     const btnText = document.getElementById("copy-transcript-text");
     if (btnText) {
       btnText.textContent = "✓ Copied!";
       setTimeout(() => btnText.textContent = "Copy Full Transcript", 2000);
     }
     showToastNotification("Full transcript copied to clipboard", "success");
-  });
+  } else {
+    showToastNotification("Failed to copy transcript", "error");
+  }
 }
 
 function downloadReaderMarkdown() {
@@ -946,12 +1004,22 @@ async function redistillCurrentVideo() {
   const original = btnText ? btnText.textContent : "Re-distill";
   if (btnText) btnText.textContent = "⏳ Distilling...";
 
+  const isLocal = !hasServerBackend() || String(currentViewingVideo.id).startsWith("local_");
+
   try {
-    const res = await fetch(apiUrl(`/api/videos/${currentViewingVideo.id}/redistill`), { method: "POST" });
-    if (!res.ok) throw new Error("Failed to re-distill transcript");
-    const data = await res.json();
-    currentViewingVideo = data;
-    renderReaderView(data);
+    if (isLocal) {
+      const updated = await distillVideoOnDevice(currentViewingVideo.video_id);
+      if (updated) {
+        currentViewingVideo = updated;
+        renderReaderView(updated);
+      }
+    } else {
+      const res = await fetch(apiUrl(`/api/videos/${currentViewingVideo.id}/redistill`), { method: "POST" });
+      if (!res.ok) throw new Error("Failed to re-distill transcript");
+      const data = await res.json();
+      currentViewingVideo = data;
+      renderReaderView(data);
+    }
     loadStats();
     if (btnText) {
       btnText.textContent = "✓ Refined!";
@@ -964,26 +1032,38 @@ async function redistillCurrentVideo() {
   }
 }
 
-function downloadMarkdownById(videoId) {
-  window.location.href = apiUrl(`/api/export/obsidian/${videoId}/download`);
-}
+async function deleteVideoById(videoId) {
+  if (!confirm(`Remove this video from your library?`)) return;
 
-async function deleteVideoById(videoId, videoTitle = "this video") {
-  if (!confirm(`Remove "${videoTitle}" from your library?`)) return;
-  try {
-    const res = await fetch(apiUrl(`/api/videos/${videoId}`), { method: "DELETE" });
-    if (res.ok) {
-      if (currentViewingVideo && currentViewingVideo.id === videoId) {
-        currentViewingVideo = null;
-      }
-      showToastNotification("Video removed from library", "info");
-      loadVideos();
-    } else {
-      showToastNotification("Failed to delete video", "error");
-    }
-  } catch (e) {
-    showToastNotification("Delete error: " + e.message, "error");
+  const strId = String(videoId);
+  // Remove from localStorage
+  const localList = getLocalVideos();
+  const updatedLocal = localList.filter(v => String(v.id) !== strId && v.video_id !== strId);
+  if (updatedLocal.length !== localList.length) {
+    saveLocalVideos(updatedLocal);
   }
+
+  // Remove associated local flashcards if any
+  const localCards = getLocalFlashcards();
+  const updatedCards = localCards.filter(c => String(c.video_id) !== strId && (!currentViewingVideo || String(c.video_id) !== currentViewingVideo.video_id));
+  saveLocalFlashcards(updatedCards);
+
+  // Try server delete if backend available and not a purely local ID
+  if (hasServerBackend() && !strId.startsWith("local_")) {
+    try {
+      await fetch(apiUrl(`/api/videos/${videoId}`), { method: "DELETE" });
+    } catch (e) {
+      console.warn("Server delete warning:", e);
+    }
+  }
+
+  if (currentViewingVideo && (String(currentViewingVideo.id) === strId || currentViewingVideo.video_id === strId)) {
+    currentViewingVideo = null;
+  }
+
+  showToastNotification("Video removed from library", "info");
+  loadVideos();
+  loadStats();
 }
 
 // Manual Capture Modal
@@ -1136,7 +1216,7 @@ async function saveAndTestGeminiKey() {
   if (testBtn) testBtn.disabled = true;
 
   // Direct client-side test to Google Gemini API
-  const candidateModels = ["gemini-3.8-flash", "gemini-3.5-flash", "gemini-3.5-flash-lite", "gemini-flash-lite-latest"];
+  const candidateModels = ["gemini-flash-lite-latest", "gemini-3.5-flash-lite", "gemini-3.8-flash", "gemini-3.5-flash"];
   let connectedModel = null;
   let lastError = null;
 
@@ -1258,21 +1338,23 @@ async function testGeminiKey() {
   return saveAndTestGeminiKey();
 }
 
-function copyCurrentOrigin() {
+async function copyCurrentOrigin() {
   const origin = window.location.origin;
-  navigator.clipboard.writeText(origin).then(() => {
+  const success = await safeCopyToClipboard(origin);
+  if (success) {
     const toast = document.getElementById("copy-url-toast");
     if (toast) {
       toast.classList.remove("hidden");
       setTimeout(() => toast.classList.add("hidden"), 3000);
     }
-  }).catch(() => {
+  } else {
     prompt("Copy this URL for your Android app:", origin);
-  });
+  }
 }
 
 // YouTube Account Status & Sync
 async function loadAccountStatus() {
+  if (!hasServerBackend()) return;
   try {
     const res = await fetch(apiUrl("/api/youtube/status"));
     if (!res.ok) return;
