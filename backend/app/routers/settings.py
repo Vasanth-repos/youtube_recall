@@ -66,4 +66,11 @@ def test_gemini(payload: Optional[Dict[str, Any]] = Body(None), db: Session = De
     
     return AIService.test_gemini_key(key)
 
+@router.get("/gemini-key")
+def get_gemini_key_for_client():
+    """Returns configured Gemini API key to bootstrap client-side autonomous distillation."""
+    key = AIService.get_gemini_key()
+    return {"api_key": key or ""}
+
+
 

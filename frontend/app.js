@@ -1173,9 +1173,22 @@ async function submitVideoIntake() {
 
 // Settings & Standalone Mode
 async function loadSettings() {
-  const storedKey = localStorage.getItem("recall_gemini_api_key");
+  let storedKey = localStorage.getItem("recall_gemini_api_key");
   const geminiEl = document.getElementById("setting-gemini-key");
   const statusBadge = document.getElementById("gemini-status-badge");
+
+  if (!storedKey && hasServerBackend()) {
+    try {
+      const res = await fetch(apiUrl("/api/settings/gemini-key"));
+      if (res.ok) {
+        const data = await res.json();
+        if (data.api_key) {
+          storedKey = data.api_key;
+          localStorage.setItem("recall_gemini_api_key", storedKey);
+        }
+      }
+    } catch (e) {}
+  }
 
   if (storedKey && geminiEl) {
     geminiEl.value = storedKey;
