@@ -60,6 +60,9 @@ class VideoResponse(BaseModel):
     final_summary: str
     transcript_clean: Optional[str] = ""
     tags: List[str] = []
+    formulas: List[Dict[str, Any]] = []
+    laws_and_principles: List[Dict[str, Any]] = []
+    rapid_recall: Dict[str, Any] = {}
     flashcards: List[FlashcardResponse] = []
     created_at: datetime
     updated_at: datetime

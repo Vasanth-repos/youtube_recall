@@ -77,12 +77,25 @@ def run_e2e_tests():
     )
     assert "summary_bullets" in recall_result and len(recall_result["summary_bullets"]) >= 1
     assert "smart_transcript" in recall_result
-    print(f"  ✓ AI Distillation generated {len(recall_result['summary_bullets'])} core bullets and {len(recall_result['smart_transcript'])} chapters")
+    assert "rapid_recall" in recall_result
+    print(f"  ✓ AI Distillation generated {len(recall_result['summary_bullets'])} core bullets, {len(recall_result['smart_transcript'])} chapters, and rapid recall pack")
 
     # -------------------------------------------------------------
     # STEP 3: Video Intake & Persistence Endpoints
     # -------------------------------------------------------------
-    print("\n[STEP 3] Testing Video Intake & Deduplication...")
+    print("\n[STEP 3] Testing Video Intake, Classifier Filtering & Deduplication...")
+    
+    # 3a. Verify entertainment video rejection without force_process
+    from backend.app.services.classifier_service import ClassifierService
+    is_edu, cat, _ = ClassifierService.evaluate_video({
+        "title": "I Spent 24 Hours in a Desert",
+        "channel_title": "MrBeast",
+        "category": "Entertainment"
+    }, "random conversation text")
+    assert is_edu is False, "Entertainment video must be filtered out!"
+    print(f"  ✓ Classifier accurately dropped entertainment video ('{cat}')")
+
+    # 3b. Intake valid educational video
     intake_payload = {
         "video_url_or_id": f"https://www.youtube.com/watch?v={test_vid_id}",
         "watch_time_seconds": 250,
@@ -93,8 +106,12 @@ def run_e2e_tests():
     assert res.status_code == 200, f"Video intake failed: {res.text}"
     intake_data = res.json()
     assert intake_data["video_id"] == test_vid_id
+    assert "formulas" in intake_data
+    assert "laws_and_principles" in intake_data
+    assert "rapid_recall" in intake_data
     video_db_id = intake_data["id"]
     print(f"  ✓ Video intake succeeded: ID={video_db_id}, Title='{intake_data['title']}'")
+    print(f"  ✓ Micro-learning assets extracted: {len(intake_data['formulas'])} formulas, {len(intake_data['laws_and_principles'])} principles")
 
     # Test Deduplication
     res = client.post("/api/videos/intake", json=intake_payload)

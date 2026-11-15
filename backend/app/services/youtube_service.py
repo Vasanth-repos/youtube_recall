@@ -52,7 +52,7 @@ class YouTubeService:
             "channel_id": "",
             "duration_seconds": 0,
             "thumbnail_url": f"https://img.youtube.com/vi/{video_id}/maxresdefault.jpg",
-            "category": "Education",
+            "category": "",
             "tags": [],
             "description": ""
         }

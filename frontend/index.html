@@ -55,6 +55,10 @@
   </script>
   <!-- Lucide Icons -->
   <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- KaTeX for crisp mathematical formulas & scientific equations -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" crossorigin="anonymous">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js" crossorigin="anonymous"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js" crossorigin="anonymous"></script>
   <link rel="stylesheet" href="styles.css">
   <link rel="stylesheet" href="/static/styles.css">
 </head>
@@ -220,52 +224,156 @@
           </div>
         </div>
 
-        <!-- Executive Key Insights (Editorial Callout) -->
-        <div class="bg-obsidian-900 border-l-2 border-l-amber-500 border border-obsidian-800 rounded-r-xl p-5 sm:p-6 shadow-sm">
-          <h3 class="text-xs font-semibold uppercase tracking-wider text-amber-400/90 mb-3 flex items-center gap-1.5">
-            <i data-lucide="bookmark" class="w-3.5 h-3.5 text-amber-400"></i>
-            Key Insights
-          </h3>
-          <ul id="reader-bullets" class="space-y-2 text-xs sm:text-sm text-zinc-200">
-            <!-- Rendered via JS -->
-          </ul>
-        </div>
-
-        <!-- Key Concepts Glossary -->
-        <div id="reader-concepts-container" class="bg-obsidian-900 border border-obsidian-800 rounded-xl p-5 shadow-sm">
-          <h3 class="text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-3 flex items-center gap-1.5">
-            <i data-lucide="hash" class="w-3.5 h-3.5 text-zinc-400"></i>
-            Core Terminology
-          </h3>
-          <div id="reader-concepts" class="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
-            <!-- Rendered via JS -->
+        <!-- Micro-Learning View Mode Switcher -->
+        <div class="flex items-center justify-between gap-3 bg-obsidian-900 border border-obsidian-800 p-1.5 rounded-xl">
+          <div class="flex items-center gap-1.5 w-full sm:w-auto">
+            <button id="btn-mode-rapid" onclick="switchReaderMode('rapid')" class="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-semibold bg-amber-500 text-zinc-950 transition-all shadow-sm">
+              <i data-lucide="zap" class="w-3.5 h-3.5 fill-current"></i>
+              <span>⚡ 5-Min Rapid Recall</span>
+            </button>
+            <button id="btn-mode-indepth" onclick="switchReaderMode('indepth')" class="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-medium text-zinc-400 hover:text-zinc-200 hover:bg-obsidian-850 transition-all">
+              <i data-lucide="book-open" class="w-3.5 h-3.5"></i>
+              <span>📖 In-Depth Chapter Reader</span>
+            </button>
+          </div>
+          <div class="hidden sm:flex items-center gap-1.5 text-[11px] text-amber-400 font-mono bg-amber-500/10 border border-amber-500/20 px-2.5 py-1 rounded-md">
+            <span>⏱️ 5-Minute Micro-Learning</span>
           </div>
         </div>
 
-        <!-- Chapter-by-Chapter Transcript & Synthesis (Single Unified Box) -->
-        <div class="bg-obsidian-900 border border-obsidian-800 rounded-xl shadow-sm overflow-hidden">
-          <!-- Header -->
-          <div class="flex items-center justify-between px-5 sm:px-6 py-4 border-b border-obsidian-800/80 bg-obsidian-950/40">
-            <h2 class="text-xs font-semibold uppercase tracking-wider text-zinc-300 flex items-center gap-2">
-              <i data-lucide="align-left" class="w-3.5 h-3.5 text-amber-400"></i>
-              <span>Chapter Breakdown</span>
-            </h2>
-            <span id="section-count-badge" class="font-mono text-[11px] text-zinc-500">0 chapters</span>
+        <!-- ============================================================== -->
+        <!-- VIEW 1: 5-Minute Rapid Recall (Default Micro-Learning View)   -->
+        <!-- ============================================================== -->
+        <div id="reader-view-rapid" class="space-y-6">
+          
+          <!-- 1. Executive 60-Second Core Thesis & Rules -->
+          <div class="bg-obsidian-900 border-l-2 border-l-amber-500 border border-obsidian-800 rounded-r-xl p-5 sm:p-6 shadow-sm space-y-3.5">
+            <div class="flex items-center justify-between">
+              <h3 class="text-xs font-semibold uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
+                <i data-lucide="sparkles" class="w-3.5 h-3.5 text-amber-400"></i>
+                <span>Core Mental Model & Thesis</span>
+              </h3>
+              <span class="text-[10px] font-mono uppercase bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2 py-0.5 rounded">60-Sec Read</span>
+            </div>
+            <p id="reader-rapid-thesis" class="text-sm sm:text-base font-serif text-zinc-100 leading-relaxed font-normal">
+              <!-- Rendered via JS -->
+            </p>
+            <div class="pt-2 border-t border-obsidian-800/80">
+              <h4 class="text-[11px] font-mono uppercase tracking-wider text-zinc-400 mb-2">Key Invariants & Rules of Thumb:</h4>
+              <ul id="reader-rapid-rules" class="space-y-1.5 text-xs sm:text-sm text-zinc-200">
+                <!-- Rendered via JS -->
+              </ul>
+            </div>
           </div>
 
-          <!-- Chapter Sections -->
-          <div id="smart-transcript-sections" class="divide-y divide-obsidian-800/80">
-            <!-- Rendered via JS -->
+          <!-- 2. Formulas & Equations Deck (for Math / Physics / Engineering) -->
+          <div id="reader-formulas-section" class="hidden bg-obsidian-900 border border-obsidian-800 rounded-xl shadow-sm overflow-hidden">
+            <div class="flex items-center justify-between px-5 sm:px-6 py-4 border-b border-obsidian-800 bg-obsidian-950/40">
+              <h2 class="text-xs font-semibold uppercase tracking-wider text-zinc-200 flex items-center gap-2">
+                <i data-lucide="function-square" class="w-4 h-4 text-amber-400"></i>
+                <span>Formulas & Mathematical Derivations</span>
+              </h2>
+              <span id="formulas-count-badge" class="font-mono text-[11px] px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">0 formulas</span>
+            </div>
+            <div id="reader-formulas-grid" class="p-5 sm:p-6 grid grid-cols-1 gap-4">
+              <!-- Rendered via JS -->
+            </div>
           </div>
 
-          <!-- Integrated Summary Synthesis -->
-          <div id="reader-synthesis-container" class="border-t border-obsidian-800/80 bg-obsidian-950/25 p-5 sm:p-6 space-y-2">
-            <h3 class="text-[11px] font-semibold uppercase tracking-wider text-amber-400/90 flex items-center gap-1.5">
-              <i data-lucide="sparkles" class="w-3.5 h-3.5 text-amber-400"></i>
-              <span>Synthesis</span>
+          <!-- 3. Scientific Laws & Core Principles Deck (for Science / Biology / Chemistry / Physics) -->
+          <div id="reader-laws-section" class="hidden bg-obsidian-900 border border-obsidian-800 rounded-xl shadow-sm overflow-hidden">
+            <div class="flex items-center justify-between px-5 sm:px-6 py-4 border-b border-obsidian-800 bg-obsidian-950/40">
+              <h2 class="text-xs font-semibold uppercase tracking-wider text-zinc-200 flex items-center gap-2">
+                <i data-lucide="atom" class="w-4 h-4 text-emerald-400"></i>
+                <span>Scientific Laws, Principles & Core Hypotheses</span>
+              </h2>
+              <span id="laws-count-badge" class="font-mono text-[11px] px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">0 principles</span>
+            </div>
+            <div id="reader-laws-grid" class="p-5 sm:p-6 grid grid-cols-1 gap-4">
+              <!-- Rendered via JS -->
+            </div>
+          </div>
+
+          <!-- 4. Chapter Landmarks (Fast 60-Second Scan) -->
+          <div class="bg-obsidian-900 border border-obsidian-800 rounded-xl shadow-sm overflow-hidden">
+            <div class="flex items-center justify-between px-5 sm:px-6 py-4 border-b border-obsidian-800 bg-obsidian-950/40">
+              <h2 class="text-xs font-semibold uppercase tracking-wider text-zinc-300 flex items-center gap-2">
+                <i data-lucide="map-pin" class="w-3.5 h-3.5 text-amber-400"></i>
+                <span>Chapter Landmarks (Fast Scan)</span>
+              </h2>
+              <span id="rapid-landmarks-count" class="font-mono text-[11px] text-zinc-500">0 landmarks</span>
+            </div>
+            <div id="reader-rapid-landmarks" class="divide-y divide-obsidian-800/70">
+              <!-- Rendered via JS -->
+            </div>
+          </div>
+
+          <!-- 5. 2-Minute Recall Flashcards (Interactive Self-Test) -->
+          <div id="reader-flashcards-section" class="bg-obsidian-900 border border-obsidian-800 rounded-xl shadow-sm overflow-hidden">
+            <div class="flex items-center justify-between px-5 sm:px-6 py-4 border-b border-obsidian-800 bg-obsidian-950/40">
+              <h2 class="text-xs font-semibold uppercase tracking-wider text-zinc-300 flex items-center gap-2">
+                <i data-lucide="help-circle" class="w-3.5 h-3.5 text-amber-400"></i>
+                <span>2-Minute Active Recall Test</span>
+              </h2>
+              <span id="rapid-flashcards-count" class="font-mono text-[11px] text-zinc-500">0 cards</span>
+            </div>
+            <div id="reader-rapid-flashcards" class="p-5 sm:p-6 grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+              <!-- Rendered via JS -->
+            </div>
+          </div>
+
+        </div>
+
+        <!-- ============================================================== -->
+        <!-- VIEW 2: In-Depth Chapter Reader (Long-Form Textbook Reading)   -->
+        <!-- ============================================================== -->
+        <div id="reader-view-indepth" class="hidden space-y-6">
+
+          <!-- Executive Key Insights (Editorial Callout) -->
+          <div class="bg-obsidian-900 border-l-2 border-l-amber-500 border border-obsidian-800 rounded-r-xl p-5 sm:p-6 shadow-sm">
+            <h3 class="text-xs font-semibold uppercase tracking-wider text-amber-400/90 mb-3 flex items-center gap-1.5">
+              <i data-lucide="bookmark" class="w-3.5 h-3.5 text-amber-400"></i>
+              Key Insights
             </h3>
-            <p id="reader-synthesis" class="text-xs sm:text-sm text-zinc-300 font-sans leading-relaxed"></p>
+            <ul id="reader-bullets" class="space-y-2 text-xs sm:text-sm text-zinc-200">
+              <!-- Rendered via JS -->
+            </ul>
           </div>
+
+          <!-- Key Concepts Glossary -->
+          <div id="reader-concepts-container" class="bg-obsidian-900 border border-obsidian-800 rounded-xl p-5 shadow-sm">
+            <h3 class="text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-3 flex items-center gap-1.5">
+              <i data-lucide="hash" class="w-3.5 h-3.5 text-zinc-400"></i>
+              Core Terminology & Concepts
+            </h3>
+            <div id="reader-concepts" class="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
+              <!-- Rendered via JS -->
+            </div>
+          </div>
+
+          <!-- Chapter-by-Chapter Transcript & Synthesis -->
+          <div class="bg-obsidian-900 border border-obsidian-800 rounded-xl shadow-sm overflow-hidden">
+            <div class="flex items-center justify-between px-5 sm:px-6 py-4 border-b border-obsidian-800/80 bg-obsidian-950/40">
+              <h2 class="text-xs font-semibold uppercase tracking-wider text-zinc-300 flex items-center gap-2">
+                <i data-lucide="align-left" class="w-3.5 h-3.5 text-amber-400"></i>
+                <span>In-Depth Chapter Analysis</span>
+              </h2>
+              <span id="section-count-badge" class="font-mono text-[11px] text-zinc-500">0 chapters</span>
+            </div>
+
+            <div id="smart-transcript-sections" class="divide-y divide-obsidian-800/80">
+              <!-- Rendered via JS -->
+            </div>
+
+            <div id="reader-synthesis-container" class="border-t border-obsidian-800/80 bg-obsidian-950/25 p-5 sm:p-6 space-y-2">
+              <h3 class="text-[11px] font-semibold uppercase tracking-wider text-amber-400/90 flex items-center gap-1.5">
+                <i data-lucide="sparkles" class="w-3.5 h-3.5 text-amber-400"></i>
+                <span>Synthesis</span>
+              </h3>
+              <p id="reader-synthesis" class="text-xs sm:text-sm text-zinc-300 font-sans leading-relaxed"></p>
+            </div>
+          </div>
+
         </div>
       </div>
 

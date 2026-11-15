@@ -46,3 +46,24 @@ def init_db():
     except Exception:
         pass
 
+    try:
+        with engine.connect() as conn:
+            conn.execute(__import__("sqlalchemy").text("ALTER TABLE videos ADD COLUMN formulas_json TEXT DEFAULT '[]'"))
+            conn.commit()
+    except Exception:
+        pass
+
+    try:
+        with engine.connect() as conn:
+            conn.execute(__import__("sqlalchemy").text("ALTER TABLE videos ADD COLUMN laws_and_principles_json TEXT DEFAULT '[]'"))
+            conn.commit()
+    except Exception:
+        pass
+
+    try:
+        with engine.connect() as conn:
+            conn.execute(__import__("sqlalchemy").text("ALTER TABLE videos ADD COLUMN rapid_recall_json TEXT DEFAULT '{}'"))
+            conn.commit()
+    except Exception:
+        pass
+

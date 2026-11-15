@@ -128,6 +128,9 @@ def process_video_pipeline(db: Session, video_req: VideoIntakeRequest) -> Video:
     video_record.topic_notes = recall_data.get("topic_notes", [])
     video_record.smart_transcript = recall_data.get("smart_transcript", recall_data.get("topic_notes", []))
     video_record.final_summary = recall_data.get("final_summary", "")
+    video_record.formulas = recall_data.get("formulas", [])
+    video_record.laws_and_principles = recall_data.get("laws_and_principles", [])
+    video_record.rapid_recall = recall_data.get("rapid_recall", {})
 
     db.add(video_record)
     db.commit()
@@ -303,6 +306,9 @@ def redistill_video_transcript(video_id: int, db: Session = Depends(get_db)):
     vid.topic_notes = recall_data.get("topic_notes", [])
     vid.smart_transcript = recall_data.get("smart_transcript", [])
     vid.final_summary = recall_data.get("final_summary", "")
+    vid.formulas = recall_data.get("formulas", [])
+    vid.laws_and_principles = recall_data.get("laws_and_principles", [])
+    vid.rapid_recall = recall_data.get("rapid_recall", {})
 
     db.commit()
     db.refresh(vid)

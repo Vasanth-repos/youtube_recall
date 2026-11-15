@@ -33,6 +33,9 @@ class Video(Base):
     final_summary = Column(Text, default="")           # High-level synthesis
     transcript_clean = Column(Text, default="")        # Parsed transcript text
     tags_json = Column(Text, default="[]")
+    formulas_json = Column(Text, default="[]")         # Mathematical & Physical formulas
+    laws_and_principles_json = Column(Text, default="[]") # Scientific laws, principles & theorems
+    rapid_recall_json = Column(Text, default="{}")     # 5-minute rapid recall pack
 
     created_at = Column(DateTime, default=utcnow)
     updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
@@ -94,6 +97,39 @@ class Video(Base):
     @tags.setter
     def tags(self, value):
         self.tags_json = json.dumps(value or [])
+
+    @property
+    def formulas(self):
+        try:
+            return json.loads(self.formulas_json or "[]")
+        except Exception:
+            return []
+
+    @formulas.setter
+    def formulas(self, value):
+        self.formulas_json = json.dumps(value or [])
+
+    @property
+    def laws_and_principles(self):
+        try:
+            return json.loads(self.laws_and_principles_json or "[]")
+        except Exception:
+            return []
+
+    @laws_and_principles.setter
+    def laws_and_principles(self, value):
+        self.laws_and_principles_json = json.dumps(value or [])
+
+    @property
+    def rapid_recall(self):
+        try:
+            return json.loads(self.rapid_recall_json or "{}")
+        except Exception:
+            return {}
+
+    @rapid_recall.setter
+    def rapid_recall(self, value):
+        self.rapid_recall_json = json.dumps(value or {})
 
 
 class Flashcard(Base):

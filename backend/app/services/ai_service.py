@@ -8,11 +8,15 @@ from backend.app.config import settings
 
 logger = logging.getLogger(__name__)
 
-RECALL_PROMPT_TEMPLATE = """You are a World-Class Technical Editor and Educator (like a senior editor for an MIT textbook or high-end technical publication).
-Your task is to transform this raw, conversational YouTube spoken transcript into an exceptionally clean, lucid, authoritative, and easy-to-understand study guide.
+RECALL_PROMPT_TEMPLATE = """You are a World-Class Technical Educator and Senior Editor (MIT/Stanford caliber).
+Your goal is to transform this raw YouTube spoken transcript into an exceptional 5-MINUTE RAPID RECALL & MICRO-LEARNING CHEAT SHEET.
 
-Raw spoken language is filled with conversational fluff, hesitations ("um", "uh", "you know"), rhetorical preambles ("well first of all", "so let's look at"), personal tangents, and run-on sentences.
-REWRITE and POLISH this content so that it reads like an authoritative, crystal-clear textbook chapter or essay.
+A student or professional should be able to review this guide in under 5 minutes and immediately recall:
+1. The Core Mental Model / Central Thesis (read in 30 seconds).
+2. The Mathematical Formulas and Equations (if a Math, Physics, or Engineering video) with clean LaTeX syntax, variables glossary, and practical derivation point.
+3. The Scientific Laws, Principles, Core Hypotheses, and Mechanisms (if a Science or Technical video).
+4. Chapter Landmarks: Compact 2-bullet takeaways for each section with timestamps.
+5. High-Yield Active Recall Flashcards testing the formulas, principles, and key mechanisms.
 
 Video Title: {title}
 Channel: {channel}
@@ -21,29 +25,53 @@ Duration: {duration}
 Transcript with Timestamps:
 {transcript_with_timestamps}
 
-You must return ONLY a valid JSON object with the exact keys:
+You must return ONLY a valid JSON object matching this schema:
 {{
   "summary_bullets": [
     "Ultra-crisp core takeaway 1: Direct, dense explanation of the central premise or mechanism.",
     "Ultra-crisp core takeaway 2: Essential mathematical, algorithmic, or structural insight.",
     "Ultra-crisp core takeaway 3: Final practical implication, rule, or theorem."
   ],
+  "rapid_recall": {{
+    "five_minute_thesis": "A powerful 1-2 sentence core mental model of the entire video that allows immediate recall.",
+    "cheat_sheet": [
+      "Key Invariant 1: Direct rule of thumb or formula application.",
+      "Key Invariant 2: Core scientific/mathematical mechanism.",
+      "Key Invariant 3: Essential takeaway for problem solving."
+    ]
+  }},
+  "formulas": [
+    {{
+      "name": "Formula or Theorem Name (e.g. 'Taylor Series Expansion' or 'Conservation of Momentum')",
+      "formula_latex": "$$P(x) = \\\\sum_{{n=0}}^{{k}} \\\\frac{{f^{{(n)}}(a)}}{{n!}}(x - a)^n$$",
+      "variables": "Explanation of variables (e.g. f^(n)(a) = n-th derivative at a, n! = factorial scaling, a = expansion center)",
+      "explanation": "Clear explanation of what the formula computes, how it simplifies calculations, and when to use it.",
+      "timestamp_label": "05:15"
+    }}
+  ],
+  "laws_and_principles": [
+    {{
+      "name": "Scientific Law, Theorem, or Principle (e.g. 'Radius of Convergence', 'Newton\\'s Second Law', 'Heisenberg Uncertainty')",
+      "statement": "Formal statement or definition of the law/principle.",
+      "mechanism": "Physical or logical mechanism explaining why it occurs.",
+      "timestamp_label": "15:20"
+    }}
+  ],
   "key_concepts": [
     "Concept 1: Clear, concise definition and why it matters",
     "Concept 2: Clear, concise definition and why it matters",
-    "Concept 3: Clear, concise definition and why it matters",
-    "Concept 4: Clear, concise definition and why it matters"
+    "Concept 3: Clear, concise definition and why it matters"
   ],
   "smart_transcript": [
     {{
       "timestamp_seconds": 0,
       "timestamp_label": "00:00",
-      "title": "Clean, Descriptive Chapter Heading (e.g. 'Matching Tangent Slopes & First Derivatives')",
+      "title": "Clean, Descriptive Chapter Heading",
       "crisp_points": [
         "First direct, on-the-point takeaway explaining the exact concept without verbal filler",
         "Second direct, high-value takeaway or rule"
       ],
-      "polished_text": "A beautifully written, easy-to-understand explanation of what was taught in this chapter. It must read like an elegant, professionally edited textbook or article."
+      "polished_text": "A concise, beautifully written paragraph explaining what was taught in this chapter."
     }}
   ],
   "topic_notes": [
@@ -57,16 +85,17 @@ You must return ONLY a valid JSON object with the exact keys:
   ],
   "flashcards": [
     {{
-      "question": "Clear, direct recall question testing a fundamental mechanism",
+      "question": "Direct recall question testing a formula, principle, or mechanism",
       "answer": "Direct, accurate, concise answer",
       "timestamp_seconds": 0,
       "timestamp_label": "00:00"
     }}
   ],
-  "final_summary": "A cohesive, 2-paragraph synthesis explaining the core thesis, mechanics, and value."
+  "final_summary": "A cohesive 2-paragraph synthesis explaining the core thesis, mechanics, and value."
 }}
 
-Do not wrap in markdown quotes or extra words; output ONLY the raw JSON object.
+If the video does not contain explicit mathematical formulas, provide an empty list [] for formulas, and extract the underlying conceptual principles into laws_and_principles.
+Do not wrap in markdown quotes; output ONLY the raw JSON object.
 """
 
 CONVERSATIONAL_PREAMBLES = [
@@ -267,7 +296,7 @@ class AIService:
 
     @classmethod
     def _normalize_result(cls, data: Dict[str, Any], chunks: List[Dict[str, Any]]) -> Dict[str, Any]:
-        """Ensures smart_transcript and topic_notes are synced and cleanly formatted."""
+        """Ensures smart_transcript, formulas, laws, and rapid recall are cleanly formatted."""
         smart_transcript = data.get("smart_transcript") or []
         if not smart_transcript and data.get("topic_notes"):
             smart_transcript = []
@@ -282,6 +311,47 @@ class AIService:
         data["smart_transcript"] = smart_transcript
         if not data.get("topic_notes"):
             data["topic_notes"] = smart_transcript
+
+        # Normalize formulas
+        raw_formulas = data.get("formulas") or []
+        clean_formulas = []
+        if isinstance(raw_formulas, list):
+            for f in raw_formulas:
+                if isinstance(f, dict) and (f.get("name") or f.get("formula_latex")):
+                    clean_formulas.append({
+                        "name": f.get("name", "Key Formula"),
+                        "formula_latex": f.get("formula_latex", f.get("formula", "")),
+                        "variables": f.get("variables", ""),
+                        "explanation": f.get("explanation", ""),
+                        "timestamp_label": f.get("timestamp_label", "00:00")
+                    })
+        data["formulas"] = clean_formulas
+
+        # Normalize laws and principles
+        raw_laws = data.get("laws_and_principles") or []
+        clean_laws = []
+        if isinstance(raw_laws, list):
+            for l in raw_laws:
+                if isinstance(l, dict) and (l.get("name") or l.get("statement")):
+                    clean_laws.append({
+                        "name": l.get("name", "Core Principle"),
+                        "statement": l.get("statement", ""),
+                        "mechanism": l.get("mechanism", ""),
+                        "timestamp_label": l.get("timestamp_label", "00:00")
+                    })
+        data["laws_and_principles"] = clean_laws
+
+        # Normalize rapid recall
+        rapid = data.get("rapid_recall") or {}
+        if not isinstance(rapid, dict):
+            rapid = {}
+        if not rapid.get("five_minute_thesis"):
+            bullets = data.get("summary_bullets") or []
+            rapid["five_minute_thesis"] = bullets[0] if bullets else data.get("final_summary", "")
+        if not rapid.get("cheat_sheet"):
+            rapid["cheat_sheet"] = data.get("summary_bullets", [])
+        data["rapid_recall"] = rapid
+
         return data
 
     @classmethod
@@ -581,11 +651,77 @@ class AIService:
             {"question": f"What is the key takeaway or conclusion in '{title}'?", "answer": bullets[-1], "timestamp_seconds": smart_transcript[-1]["timestamp_seconds"] if smart_transcript else 0, "timestamp_label": smart_transcript[-1]["timestamp_label"] if smart_transcript else "00:00"}
         ]
 
+        # 5. Extract Formulas & Laws (Heuristic Offline Engine)
+        formulas = []
+        laws_and_principles = []
+        
+        math_patterns = [
+            (r'f\s*\([xXyYzZ]\)|f\'|f\'\'|f\^\(n\)', "Derivative / Functional Approximation", "$$f^{(n)}(x)$$", "Higher-order functional derivation"),
+            (r'(\b\d+!\b|factorial)', "Factorial Scaling Invariant", "$$n! = n(n-1)...1$$", "Counteracts repeated power rule multipliers"),
+            (r'(e\^x|e\^\([^\)]+\))', "Exponential Power Series", "$$e^x = \\sum_{n=0}^{\\infty} \\frac{x^n}{n!}$$", "Standard exponential expansion"),
+            (r'(taylor series|maclaurin)', "Taylor Series General Expansion", "$$P(x) = \\sum_{n=0}^{\\infty} \\frac{f^{(n)}(a)}{n!}(x-a)^n$$", "Polynomial approximation around anchor point a"),
+            (r'(\bo\(n\b|\bo\(\w+\))', "Asymptotic Complexity Bound", "$$O(f(n))$$", "Algorithmic resource scaling bound")
+        ]
+        
+        full_text_lower = transcript_text.lower()
+        for pat, fname, ftex, fdesc in math_patterns:
+            m = re.search(pat, transcript_text, re.IGNORECASE)
+            if m:
+                ts_lbl = "00:00"
+                if chunks:
+                    for ch in chunks:
+                        if m.group(0).lower() in ch.get("content", "").lower():
+                            ts_lbl = ch.get("timestamp_label", "00:00")
+                            break
+                formulas.append({
+                    "name": fname,
+                    "formula_latex": ftex,
+                    "variables": "See chapter context",
+                    "explanation": fdesc,
+                    "timestamp_label": ts_lbl
+                })
+                if len(formulas) >= 3:
+                    break
+
+        science_patterns = [
+            (r'(radius of convergence|convergence)', "Radius of Convergence Principle", "Power series converge within distance R from expansion center.", "Outside this radius, higher-order polynomial terms diverge to infinity."),
+            (r'(conservation of energy|first law)', "First Law of Thermodynamics (Energy Conservation)", "Total energy in an isolated system remains constant.", "Energy is transformed between kinetic, potential, and thermal forms."),
+            (r'(second law|entropy)', "Second Law of Thermodynamics (Entropy Increase)", "Total entropy of an isolated system always increases over time.", "Spontaneous processes proceed towards maximum thermodynamic probability."),
+            (r'(newton|f\s*=\s*ma|force)', "Newton's Second Law of Motion", "Force equals the rate of change of momentum (F = ma).", "Net applied force accelerates mass inversely proportional to inertia."),
+            (r'(quantum|uncertainty principle)', "Heisenberg Uncertainty Principle", "Cannot simultaneously determine precise position and momentum.", "Fundamental wave-particle duality property of physical quantum states."),
+            (r'(central dogma|dna|rna)', "Central Dogma of Molecular Biology", "Genetic information flows unidirectionally: DNA -> RNA -> Protein.", "Transcription creates messenger RNA; translation synthesizes functional polypeptides.")
+        ]
+        for pat, lname, lstmt, lmech in science_patterns:
+            if re.search(pat, full_text_lower):
+                ts_lbl = "00:00"
+                if chunks:
+                    for ch in chunks:
+                        if re.search(pat, ch.get("content", "").lower()):
+                            ts_lbl = ch.get("timestamp_label", "00:00")
+                            break
+                laws_and_principles.append({
+                    "name": lname,
+                    "statement": lstmt,
+                    "mechanism": lmech,
+                    "timestamp_label": ts_lbl
+                })
+                if len(laws_and_principles) >= 3:
+                    break
+
+        rapid_recall = {
+            "five_minute_thesis": bullets[0] if bullets else f"Central framework of {title}.",
+            "cheat_sheet": bullets[:3],
+            "key_takeaways": bullets
+        }
+
         return {
             "summary_bullets": bullets[:3],
             "key_concepts": key_concepts,
             "smart_transcript": smart_transcript,
             "topic_notes": topic_notes,
             "flashcards": flashcards,
-            "final_summary": final_summary
+            "final_summary": final_summary,
+            "formulas": formulas,
+            "laws_and_principles": laws_and_principles,
+            "rapid_recall": rapid_recall
         }
