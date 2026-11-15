@@ -91,6 +91,16 @@ function extractYouTubeVideoId(urlOrId) {
   return null;
 }
 
+function escapeHtml(str) {
+  if (str === null || str === undefined) return "";
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 function safeParseJson(text) {
   if (!text) return null;
   try {
@@ -463,14 +473,14 @@ function handleSortChange() {
   loadVideos();
 }
 
-document.addEventListener("DOMContentLoaded", () => {
-  if (window.lucide) lucide.createIcons();
-  loadStats();
-  loadVideos();
-  loadSettings();
-  loadAccountStatus();
-  checkAutoCaptureStatus();
-  handleIncomingShareTarget();
+document.addEventListener("DOMContentLoaded", async () => {
+  try { if (window.lucide) lucide.createIcons(); } catch (e) { console.error("Lucide init error", e); }
+  try { await loadVideos(); } catch (e) { console.error("loadVideos error", e); }
+  try { await loadStats(); } catch (e) { console.error("loadStats error", e); }
+  try { await loadSettings(); } catch (e) { console.error("loadSettings error", e); }
+  try { await loadAccountStatus(); } catch (e) { console.error("loadAccountStatus error", e); }
+  try { await checkAutoCaptureStatus(); } catch (e) { console.error("checkAutoCaptureStatus error", e); }
+  try { await handleIncomingShareTarget(); } catch (e) { console.error("handleIncomingShareTarget error", e); }
 
   if (sessionStorage.getItem("recall_dismiss_share_tip")) {
     const banner = document.getElementById("banner-share-tip");
@@ -481,6 +491,23 @@ document.addEventListener("DOMContentLoaded", () => {
   if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("/sw.js").catch(() => { });
   }
+
+  // Render Math on full window load if KaTeX finished loading
+  window.addEventListener("load", () => {
+    if (typeof renderMathInElement === "function" && currentViewingVideo) {
+      try {
+        renderMathInElement(document.getElementById("reader-content"), {
+          delimiters: [
+            { left: "$$", right: "$$", display: true },
+            { left: "\\[", right: "\\]", display: true },
+            { left: "\\(", right: "\\)", display: false },
+            { left: "$", right: "$", display: false }
+          ],
+          throwOnError: false
+        });
+      } catch (e) {}
+    }
+  });
 
   // Realtime auto-refresh when tab gains focus
   window.addEventListener("focus", () => {
@@ -722,10 +749,16 @@ async function autoIntakeSharedVideo(videoId) {
 function renderVideosGrid() {
   const grid = document.getElementById("videos-grid");
   const empty = document.getElementById("library-empty");
-  const search = document.getElementById("search-input").value.toLowerCase();
+  if (!grid) return;
 
-  let filtered = allVideos.filter(v => {
-    const matchSearch = v.title.toLowerCase().includes(search) || v.channel_title.toLowerCase().includes(search);
+  const searchEl = document.getElementById("search-input");
+  const search = (searchEl ? searchEl.value : "").toLowerCase().trim();
+
+  let filtered = (allVideos || []).filter(v => {
+    if (!v) return false;
+    const title = (v.title || "").toLowerCase();
+    const channel = (v.channel_title || "").toLowerCase();
+    const matchSearch = !search || title.includes(search) || channel.includes(search);
     const matchCat = !activeCategory || (v.category && v.category.toLowerCase().includes(activeCategory.toLowerCase()));
     return matchSearch && matchCat;
   });
@@ -733,11 +766,11 @@ function renderVideosGrid() {
   // Client-side sort fallback / consistency
   filtered.sort((a, b) => {
     if (currentSort === "recently_watched") {
-      const timeA = new Date(a.last_watched_at || a.updated_at || a.created_at).getTime();
-      const timeB = new Date(b.last_watched_at || b.updated_at || b.created_at).getTime();
+      const timeA = new Date(a.last_watched_at || a.updated_at || a.created_at || 0).getTime();
+      const timeB = new Date(b.last_watched_at || b.updated_at || b.created_at || 0).getTime();
       return timeB - timeA;
     } else if (currentSort === "newest") {
-      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
     } else if (currentSort === "duration") {
       return (b.duration_seconds || 0) - (a.duration_seconds || 0);
     } else if (currentSort === "title") {
@@ -748,38 +781,43 @@ function renderVideosGrid() {
 
   if (filtered.length === 0) {
     grid.innerHTML = "";
-    empty.classList.remove("hidden");
+    if (empty) empty.classList.remove("hidden");
     return;
   }
 
-  empty.classList.add("hidden");
+  if (empty) empty.classList.add("hidden");
   grid.innerHTML = filtered.map(v => {
-    const durationMin = Math.floor(v.duration_seconds / 60);
+    const durationMin = Math.floor((v.duration_seconds || 0) / 60);
     const sections = v.smart_transcript || v.topic_notes || [];
-    const bulletsCount = v.summary_bullets ? v.summary_bullets.length : 0;
     const watchedTime = formatRelativeTime(v.last_watched_at || v.created_at);
+    const safeTitle = escapeHtml(v.title || "Untitled Video");
+    const safeChannel = escapeHtml(v.channel_title || "Unknown Channel");
+    const safeCategory = escapeHtml(v.category || "General");
+    const rawVidId = v.video_id || "";
+    const rawId = String(v.id || v.video_id || "");
+    const thumbUrl = v.thumbnail_url || ('https://img.youtube.com/vi/' + rawVidId + '/mqdefault.jpg');
 
     return `
       <div class="bg-obsidian-900/90 border border-obsidian-750/80 rounded-xl overflow-hidden hover:border-obsidian-600 transition-all flex flex-col justify-between group shadow-sm">
         <div>
           <!-- Thumbnail & duration pill -->
-          <div class="relative aspect-video bg-obsidian-950 overflow-hidden cursor-pointer" onclick="openReaderForVideo('${v.video_id}')">
-            <img src="${v.thumbnail_url || 'https://img.youtube.com/vi/' + v.video_id + '/mqdefault.jpg'}" onerror="this.onerror=null; this.src='/static/icon.svg'; this.classList.add('p-8');" alt="${v.title}" class="w-full h-full object-cover group-hover:scale-102 transition-transform duration-300">
+          <div class="relative aspect-video bg-obsidian-950 overflow-hidden cursor-pointer" onclick="openReaderForVideo('${rawVidId}')">
+            <img src="${thumbUrl}" onerror="this.onerror=null; this.src='/static/icon.svg'; this.classList.add('p-8');" alt="${safeTitle}" class="w-full h-full object-cover group-hover:scale-102 transition-transform duration-300">
             <span class="absolute bottom-2 right-2 px-1.5 py-0.5 rounded text-[10px] font-mono bg-black/80 text-zinc-300 font-medium">
               ${durationMin}m
             </span>
             <span class="absolute top-2 left-2 px-2 py-0.5 rounded text-[9px] font-mono tracking-wider uppercase bg-obsidian-950/85 text-amber-400/90 border border-amber-500/20 backdrop-blur">
-              ${v.category}
+              ${safeCategory}
             </span>
           </div>
 
           <!-- Video Details -->
           <div class="p-4">
-            <h3 onclick="openReaderForVideo('${v.video_id}')" class="font-serif font-medium text-zinc-100 text-sm sm:text-base line-clamp-2 hover:text-amber-400 cursor-pointer transition-colors mb-1.5 leading-snug">
-              ${v.title}
+            <h3 onclick="openReaderForVideo('${rawVidId}')" class="font-serif font-medium text-zinc-100 text-sm sm:text-base line-clamp-2 hover:text-amber-400 cursor-pointer transition-colors mb-1.5 leading-snug">
+              ${safeTitle}
             </h3>
             <div class="flex items-center gap-2 text-xs text-zinc-400 mb-2">
-              <span class="text-zinc-300 font-medium truncate max-w-[140px]">${v.channel_title}</span>
+              <span class="text-zinc-300 font-medium truncate max-w-[140px]">${safeChannel}</span>
               <span class="text-zinc-600">•</span>
               <span class="text-zinc-400 font-mono text-[11px] flex items-center gap-1.5" title="Watched: ${v.last_watched_at || v.created_at}">
                 <i data-lucide="clock" class="w-3 h-3 text-amber-500/80"></i>
@@ -793,11 +831,11 @@ function renderVideosGrid() {
         <div class="px-4 py-3 border-t border-obsidian-800/80 mt-auto flex items-center justify-between text-xs text-zinc-400">
           <span class="text-[11px] text-zinc-500 font-mono">${sections.length} chapters</span>
           <div class="flex items-center gap-1.5">
-            <button onclick="openReaderForVideo('${v.video_id}')" title="Read Transcript" class="px-2.5 py-1 rounded-md bg-obsidian-800 hover:bg-obsidian-750 text-amber-400 text-xs font-medium flex items-center gap-1.5 transition-colors border border-obsidian-700">
+            <button onclick="openReaderForVideo('${rawVidId}')" title="Read Transcript" class="px-2.5 py-1 rounded-md bg-obsidian-800 hover:bg-obsidian-750 text-amber-400 text-xs font-medium flex items-center gap-1.5 transition-colors border border-obsidian-700">
               <i data-lucide="book-open" class="w-3.5 h-3.5"></i>
               <span>Read</span>
             </button>
-            <button onclick="deleteVideoById('${v.id}')" title="Delete" class="p-1 rounded-md hover:bg-obsidian-800 text-zinc-500 hover:text-rose-400 transition-colors">
+            <button onclick="deleteVideoById('${rawId}')" title="Delete" class="p-1 rounded-md hover:bg-obsidian-800 text-zinc-500 hover:text-rose-400 transition-colors">
               <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
             </button>
           </div>
@@ -827,7 +865,7 @@ function filterCategory(cat) {
 
 // Open Smart Reader for Video
 function openReaderForVideo(videoId) {
-  const vid = allVideos.find(v => v.video_id === videoId || v.id == videoId);
+  const vid = allVideos.find(v => v.video_id === videoId || String(v.id) === String(videoId));
   if (!vid) return;
   currentViewingVideo = vid;
   const dot = document.getElementById("active-video-dot");
@@ -903,11 +941,16 @@ function renderReaderView(video) {
   if (empty) empty.classList.add("hidden");
 
   // Title & Metadata
-  document.getElementById("reader-title").textContent = video.title;
-  document.getElementById("reader-category").textContent = video.category || "General";
-  document.getElementById("reader-channel").textContent = video.channel_title || "Unknown Channel";
-  document.getElementById("reader-duration").textContent = `${Math.floor((video.duration_seconds || 0) / 60)}m ${(video.duration_seconds || 0) % 60}s`;
-  document.getElementById("reader-yt-link").href = `https://www.youtube.com/watch?v=${video.video_id}`;
+  const titleEl = document.getElementById("reader-title");
+  if (titleEl) titleEl.textContent = video.title || "Untitled Video";
+  const catEl = document.getElementById("reader-category");
+  if (catEl) catEl.textContent = video.category || "General";
+  const chanEl = document.getElementById("reader-channel");
+  if (chanEl) chanEl.textContent = video.channel_title || "Unknown Channel";
+  const durEl = document.getElementById("reader-duration");
+  if (durEl) durEl.textContent = `${Math.floor((video.duration_seconds || 0) / 60)}m ${(video.duration_seconds || 0) % 60}s`;
+  const linkEl = document.getElementById("reader-yt-link");
+  if (linkEl) linkEl.href = `https://www.youtube.com/watch?v=${video.video_id || ''}`;
 
   // ==============================================================
   // 1. POPULATE 5-MINUTE RAPID RECALL VIEW
@@ -1251,7 +1294,8 @@ function renderTranscriptSections(sections, videoId) {
 
 // In-transcript realtime filter
 function filterTranscriptSections() {
-  const query = document.getElementById("transcript-filter").value.toLowerCase().trim();
+  const filterEl = document.getElementById("transcript-filter");
+  const query = (filterEl ? filterEl.value : "").toLowerCase().trim();
   const cards = document.querySelectorAll(".transcript-section-card");
 
   cards.forEach(card => {
@@ -1529,7 +1573,6 @@ async function submitVideoIntake() {
 
 // Settings & Standalone Mode
 async function loadSettings() {
-  const storedKey = localStorage.getItem("recall_gemini_api_key");
   let storedKey = localStorage.getItem("recall_gemini_api_key");
   const geminiEl = document.getElementById("setting-gemini-key");
   const statusBadge = document.getElementById("gemini-status-badge");
