@@ -172,6 +172,15 @@
       
       <!-- Populated Reader Container -->
       <div id="reader-content" class="space-y-6">
+        <!-- Back Navigation Breadcrumb -->
+        <div class="flex items-center justify-between pt-1">
+          <button onclick="switchTab('library')" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-obsidian-900 hover:bg-obsidian-850 text-xs text-zinc-300 hover:text-amber-400 border border-obsidian-800 transition-colors shadow-sm group">
+            <i data-lucide="arrow-left" class="w-3.5 h-3.5 group-hover:-translate-x-0.5 transition-transform text-amber-400"></i>
+            <span>Back to Library</span>
+          </button>
+          <span class="hidden sm:inline-block text-[11px] font-mono text-zinc-500">Shortcut: Press <kbd class="px-1.5 py-0.5 rounded bg-obsidian-850 border border-obsidian-750 text-zinc-400">Esc</kbd> to return</span>
+        </div>
+
         <!-- Video Header Card (Editorial Publication Style) -->
         <div class="bg-obsidian-900 border border-obsidian-800 rounded-xl p-5 sm:p-7 shadow-sm space-y-4">
           <!-- Metadata Row -->
@@ -212,14 +221,6 @@
                 <span id="redistill-btn-text">Re-distill</span>
               </button>
             </div>
-          </div>
-
-          <!-- In-Transcript Realtime Filter -->
-          <div class="relative pt-1">
-            <div class="absolute inset-y-0 left-0 pt-1 pl-3 flex items-center pointer-events-none text-zinc-500">
-              <i data-lucide="search" class="w-3.5 h-3.5"></i>
-            </div>
-            <input type="text" id="transcript-filter" onkeyup="filterTranscriptSections()" placeholder="Search within chapters..." class="w-full bg-obsidian-950 border border-obsidian-800 rounded-md pl-9 pr-3 py-1.5 text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none transition-colors">
           </div>
         </div>
 
@@ -352,12 +353,20 @@
 
           <!-- Chapter-by-Chapter Transcript & Synthesis -->
           <div class="bg-obsidian-900 border border-obsidian-800 rounded-xl shadow-sm overflow-hidden">
-            <div class="flex items-center justify-between px-5 sm:px-6 py-4 border-b border-obsidian-800/80 bg-obsidian-950/40">
-              <h2 class="text-xs font-semibold uppercase tracking-wider text-zinc-300 flex items-center gap-2">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 sm:px-6 py-4 border-b border-obsidian-800/80 bg-obsidian-950/40">
+              <div class="flex items-center gap-2">
                 <i data-lucide="align-left" class="w-3.5 h-3.5 text-amber-400"></i>
-                <span>In-Depth Chapter Analysis</span>
-              </h2>
-              <span id="section-count-badge" class="font-mono text-[11px] text-zinc-500">0 chapters</span>
+                <h2 class="text-xs font-semibold uppercase tracking-wider text-zinc-300">In-Depth Chapter Analysis</h2>
+                <span id="section-count-badge" class="font-mono text-[11px] text-zinc-500 ml-1">0 chapters</span>
+              </div>
+
+              <!-- In-Transcript Realtime Filter -->
+              <div class="relative w-full sm:w-64">
+                <div class="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-zinc-500">
+                  <i data-lucide="search" class="w-3.5 h-3.5"></i>
+                </div>
+                <input type="text" id="transcript-filter" onkeyup="filterTranscriptSections()" placeholder="Filter chapters..." class="w-full bg-obsidian-950 border border-obsidian-800 rounded-lg pl-8 pr-3 py-1 text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-amber-500/40 transition-colors">
+              </div>
             </div>
 
             <div id="smart-transcript-sections" class="divide-y divide-obsidian-800/80">

@@ -164,7 +164,7 @@ async function runVerification() {
   const flashcardsGrid = document.getElementById("reader-rapid-flashcards").innerHTML;
   console.log(`Flashcards Grid HTML Length: ${flashcardsGrid.length} characters`);
 
-  if (formulasGrid.includes("Cyclic Property of Powers of i") || formulasGrid.includes("formula")) {
+  if (formulasGrid.length > 100 && (formulasGrid.includes("Imaginary") || formulasGrid.includes("Formula") || formulasGrid.includes("Exponent"))) {
     console.log("PASS: Math formulas correctly rendered in Reader!");
   } else {
     console.error("FAIL: Formulas missing from reader-formulas-grid!");

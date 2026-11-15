@@ -11,11 +11,16 @@ logger = logging.getLogger(__name__)
 RECALL_PROMPT_TEMPLATE = """You are a World-Class Technical Educator and Senior Editor (MIT/Stanford caliber).
 Your goal is to transform this raw YouTube spoken transcript into an exceptional 5-MINUTE RAPID RECALL & MICRO-LEARNING CHEAT SHEET.
 
+CRITICAL LANGUAGE MANDATE:
+- ALL FIELDS IN YOUR OUTPUT MUST BE 100% IN CLEAR, ACCURATE, FLUENT ENGLISH.
+- If the original video audio, speaker, title, or transcript is in Hindi, Tamil, Telugu, Spanish, French, German, or any other regional or foreign language, YOU MUST TRANSLATE AND FORMALIZE EVERYTHING ENTIRELY INTO ENGLISH.
+- NEVER OUTPUT HINDI (DEVANAGARI CHARACTERS) OR TRANSLITERATED HINGLISH TEXT IN ANY FIELD. Every bullet, thesis, formula explanation, principle, chapter point, and flashcard must be in English.
+
 STRICT INSTRUCTION ON CONCEPTUAL DEPTH AND MATH/SCIENCE REVISION:
 - ABSOLUTELY NEVER output vague meta-descriptions like "Overview of syllabus problems", "Focus on fundamental definitions", or "The video opens with an introduction".
 - INSTEAD, YOU MUST EXPLICITLY STATE THE EXACT MATHEMATICAL/SCIENTIFIC CONCEPTS, THE ACTUAL FORMULAS USED, THE NUMERICAL IDENTITIES, AND THE STEP-BY-STEP PROBLEM-SOLVING RULES.
 - If the video covers Complex Numbers, Calculus, Physics, Chemistry, or Engineering, write out the ACTUAL equations in clean LaTeX notation (e.g. $$i = \\\\sqrt{{-1}}$$, $$i^2 = -1$$, $$i^3 = -i$$, $$i^4 = 1$$, $$i^{{4k+r}} = i^r$$, $$a^m \\\\cdot a^n = a^{{m+n}}$$, etc.).
-- If the transcript is in Hindi, Hinglish, Tamil-English, or mixed spoken language, TRANSLATE AND FORMALIZE THE CONCEPTS INTO CRYSTAL-CLEAR ENGLISH WITH PRECISE MATHEMATICAL NOTATION.
+- TRANSLATE AND FORMALIZE ALL CONCEPTS INTO CRYSTAL-CLEAR ENGLISH WITH PRECISE MATHEMATICAL NOTATION.
 - In `smart_transcript`, each chapter's `crisp_points` must teach the ACTUAL MATHEMATICAL RULES and SOLVED EXAMPLES (e.g. "To simplify $$i^{{17}}$$, express as $$i^{{16}} \\\\cdot i = (i^4)^4 \\\\cdot i = 1 \\\\cdot i = i$$"), NOT just saying "Exercises are solved".
 
 A student or professional should be able to review this guide in under 5 minutes and immediately recall:
@@ -365,10 +370,12 @@ class AIService:
     def _call_gemini(cls, prompt: str, api_key: str) -> Optional[Dict[str, Any]]:
         """Calls Google AI Studio / Gemini API using candidate models with automatic fallback."""
         candidate_models = [
+            "gemini-flash-latest",
             "gemini-flash-lite-latest",
-            "gemini-3.5-flash-lite",
             "gemini-3.5-flash",
-            "gemini-3.8-flash"
+            "gemini-3.5-flash-lite",
+            "gemini-2.5-flash",
+            "gemini-pro-latest"
         ]
         for model in candidate_models:
             url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
@@ -380,7 +387,7 @@ class AIService:
                 }
             }
             try:
-                resp = requests.post(url, json=payload, timeout=10)
+                resp = requests.post(url, json=payload, timeout=30)
                 if resp.status_code == 200:
                     data = resp.json()
                     candidates = data.get("candidates", [])
@@ -501,6 +508,37 @@ class AIService:
         if not raw_sentences:
             raw_sentences = [title]
 
+        # Detect if source contains non-Latin scripts (e.g. Hindi Devanagari, Tamil, etc.)
+        has_devanagari = bool(re.search(r'[\u0900-\u097F]', transcript_text))
+        is_math = bool(re.search(r'(complex|math|calculus|algebra|series|derivative|integral|equation|matrix|power of i)', f"{title} {transcript_text}", re.IGNORECASE))
+        is_science = bool(re.search(r'(physics|chem|bio|quantum|thermo|mechanics|energy|wave)', f"{title} {transcript_text}", re.IGNORECASE))
+
+        # Domain-aware English fallbacks for non-English sources or sparse transcripts
+        if is_math:
+            fallback_bullets = [
+                f"Core foundations of {title}: Establishes governing algebraic identities, domain definitions, and analytical properties.",
+                "Systematic problem-solving rules and reduction algorithms for evaluating complex expressions.",
+                "Actionable mathematical takeaways and step-by-step methods for active recall and revision."
+            ]
+        elif is_science:
+            fallback_bullets = [
+                f"Governing principles and empirical foundations analyzed in {title}.",
+                "Underlying mechanisms, physical laws of conservation, and experimental observations.",
+                "Structured takeaways detailing the core hypothesis and practical implications."
+            ]
+        else:
+            fallback_bullets = [
+                f"Core mental model and thesis developed in '{title}'.",
+                "Systematic exploration of primary mechanisms, techniques, and structured frameworks.",
+                "Actionable takeaways for active recall, long-term mastery, and practical application."
+            ]
+
+        def is_clean_english(text: str) -> bool:
+            if not text:
+                return False
+            # Reject if contains Devanagari or other non-Latin scripts
+            return not bool(re.search(r'[\u0900-\u0D7F\u0E00-\u0FFF]', text))
+
         # Stopwords
         stopwords = {
             "the", "and", "a", "an", "in", "to", "of", "is", "that", "it", "this", "for", "with",
@@ -514,13 +552,13 @@ class AIService:
         # Calculate informative word frequencies
         word_freq: Dict[str, int] = {}
         for s in raw_sentences:
-            if cls.is_substantive_sentence(s):
+            if cls.is_substantive_sentence(s) and is_clean_english(s):
                 for w in re.findall(r'\b[a-zA-Z]{4,}\b', s.lower()):
                     if w not in stopwords:
                         word_freq[w] = word_freq.get(w, 0) + 1
 
         def score_sentence(sent: str) -> float:
-            if not cls.is_substantive_sentence(sent):
+            if not cls.is_substantive_sentence(sent) or not is_clean_english(sent):
                 return -10.0
             words = [w for w in re.findall(r'\b[a-zA-Z]{4,}\b', sent.lower()) if w not in stopwords]
             if not words:
@@ -531,7 +569,7 @@ class AIService:
                 score *= 1.4
             return score
 
-        scored_sentences = sorted(raw_sentences, key=score_sentence, reverse=True)
+        scored_sentences = [s for s in sorted(raw_sentences, key=score_sentence, reverse=True) if is_clean_english(s)]
 
         # 1. Executive 3-Bullet Takeaways (Spanning Beginning, Middle & Conclusion)
         n = len(raw_sentences)
@@ -543,27 +581,23 @@ class AIService:
         
         bullets = []
         for part in thirds:
-            part_scored = sorted(part, key=score_sentence, reverse=True)
+            part_scored = [s for s in sorted(part, key=score_sentence, reverse=True) if is_clean_english(s)]
             for s in part_scored:
                 cleaned = cls.clean_and_distill_sentence(s)
-                if cleaned and cleaned not in bullets and len(cleaned) > 35:
+                if cleaned and cleaned not in bullets and len(cleaned) > 35 and is_clean_english(cleaned):
                     bullets.append(cleaned)
                     break
 
         if len(bullets) < 3:
             for s in scored_sentences:
                 cleaned = cls.clean_and_distill_sentence(s)
-                if cleaned and cleaned not in bullets and len(cleaned) > 35:
+                if cleaned and cleaned not in bullets and len(cleaned) > 35 and is_clean_english(cleaned):
                     bullets.append(cleaned)
                 if len(bullets) == 3:
                     break
 
         if len(bullets) < 3:
-            bullets.extend([
-                f"Core mechanism of {title}.",
-                "Mathematical and conceptual framework for functional approximation.",
-                "Actionable takeaways for modeling and technical application."
-            ][len(bullets):])
+            bullets.extend(fallback_bullets[len(bullets):])
 
         # 2. Key Concepts & Definitions
         top_terms = sorted(word_freq.items(), key=lambda x: x[1], reverse=True)[:8]
@@ -596,21 +630,23 @@ class AIService:
                 crisp_points = []
                 for cs in sorted_chunk_sentences:
                     cleaned_pt = cls.clean_and_distill_sentence(cs)
-                    if cleaned_pt and cleaned_pt not in crisp_points and len(cleaned_pt) > 25:
+                    if cleaned_pt and cleaned_pt not in crisp_points and len(cleaned_pt) > 25 and is_clean_english(cleaned_pt):
                         crisp_points.append(cleaned_pt)
                     if len(crisp_points) == 3:
                         break
 
                 if not crisp_points and chunk_raw_sentences:
-                    crisp_points = [cls.clean_and_distill_sentence(chunk_raw_sentences[0])]
+                    cand = cls.clean_and_distill_sentence(chunk_raw_sentences[0])
+                    if is_clean_english(cand):
+                        crisp_points = [cand]
 
                 # Generate clean readable paragraphs (3-4 cleaned sentences)
                 polished_sentences = []
                 for cs in chunk_raw_sentences[:5]:
-                    if cls.is_substantive_sentence(cs):
+                    if cls.is_substantive_sentence(cs) and is_clean_english(cs):
                         polished_sentences.append(cls.clean_and_distill_sentence(cs))
 
-                polished_text = " ".join(polished_sentences) if polished_sentences else cls.clean_and_distill_sentence(raw_chunk_text[:300])
+                polished_text = " ".join(polished_sentences) if polished_sentences else ""
 
                 # Descriptive Chapter Heading
                 chunk_words = [w for w in re.findall(r'\b[a-zA-Z]{4,}\b', raw_chunk_text.lower()) if w not in stopwords]
@@ -623,6 +659,15 @@ class AIService:
                     section_title = f"{top_chunk_words[0][0].capitalize()}" + (f" & {top_chunk_words[1][0].capitalize()}" if len(top_chunk_words) > 1 else "")
                 else:
                     section_title = f"Topic Overview {idx + 1}"
+
+                # Ensure English points and prose
+                if not crisp_points:
+                    crisp_points = [
+                        f"Foundational concepts and principles in {section_title}.",
+                        f"Procedural problem-solving rules and techniques from {title}."
+                    ]
+                if not polished_text or not is_clean_english(polished_text):
+                    polished_text = f"This chapter examines foundational mechanisms and step-by-step methods in '{section_title}', focusing on conceptual clarity and problem-solving rules in {title}."
 
                 ts_sec = int(chunk.get("start", 0))
                 ts_lbl = chunk.get("timestamp_label", "00:00")
@@ -650,22 +695,22 @@ class AIService:
                 "timestamp_label": "00:00",
                 "jump_url": "",
                 "title": "Complete Overview",
-                "crisp_points": bullets,
-                "polished_text": cls.clean_and_distill_sentence(transcript_text[:500])
+                "crisp_points": bullets[:2],
+                "polished_text": f"This lecture explores foundational principles and mechanisms in '{title}' by {channel}."
             })
             topic_notes.append({
                 "timestamp_seconds": 0,
                 "timestamp_label": "00:00",
                 "title": "Complete Overview",
                 "summary": bullets[0],
-                "takeaways": bullets
+                "takeaways": bullets[:2]
             })
 
         # 4. Final Comprehensive Synthesis
         final_summary = (
             f"In '{title}' by {channel}, the content revolves around core mathematical and computational mechanisms. "
             f"Primary Takeaway: {bullets[0]} "
-            f"The analysis systematically explores {', '.join(t[0].capitalize() for t in top_terms[:3])}, "
+            f"The analysis systematically explores {', '.join(t[0].capitalize() for t in top_terms[:3]) if top_terms else 'foundational principles'}, "
             f"demonstrating that {bullets[-1]}"
         )
 
@@ -737,10 +782,12 @@ class AIService:
                 if len(laws_and_principles) >= 3:
                     break
 
+        clean_bullets = [b for b in bullets if is_clean_english(b)] or fallback_bullets
+
         rapid_recall = {
-            "five_minute_thesis": bullets[0] if bullets else f"Central framework of {title}.",
-            "cheat_sheet": bullets[:3],
-            "key_takeaways": bullets
+            "five_minute_thesis": clean_bullets[0] if clean_bullets else f"Central framework of {title}.",
+            "cheat_sheet": clean_bullets[:3],
+            "key_takeaways": clean_bullets
         }
 
         return {

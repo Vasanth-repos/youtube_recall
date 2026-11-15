@@ -164,11 +164,16 @@ async function distillVideoOnDevice(videoId) {
     (document.getElementById("setting-gemini-key") ? document.getElementById("setting-gemini-key").value.trim() : "");
 
   let result = null;
-  const candidateModels = ["gemini-flash-lite-latest", "gemini-3.5-flash-lite", "gemini-3.8-flash", "gemini-3.5-flash"];
+  const candidateModels = ["gemini-flash-latest", "gemini-flash-lite-latest", "gemini-3.5-flash", "gemini-2.5-flash", "gemini-pro-latest"];
 
   if (geminiKey) {
     const prompt = `You are an expert technical educator and editor.
 Transform this YouTube video into an exceptional 5-MINUTE RAPID RECALL & MICRO-LEARNING CHEAT SHEET.
+
+CRITICAL LANGUAGE REQUIREMENT:
+- ALL OUTPUT MUST BE EXCLUSIVELY AND STRICTLY IN FLUENT, PROFESSIONAL ENGLISH.
+- If the original video title, transcript, audio, or description is in Hindi, Tamil, Telugu, Spanish, French, or any other non-English language, TRANSLATE AND SYNTHESIZE EVERYTHING STRICTLY INTO ENGLISH.
+- NEVER output Hindi (Devanagari characters) or Hinglish text in any field.
 
 Video Title: ${meta.title}
 Creator/Channel: ${meta.author_name}
@@ -514,6 +519,26 @@ document.addEventListener("DOMContentLoaded", async () => {
     loadVideos();
     loadStats();
     checkAutoCaptureStatus();
+  });
+
+  // Press Escape to return to Library from Reader or close open modals
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+      const intakeModal = document.getElementById("capture-modal");
+      if (intakeModal && !intakeModal.classList.contains("hidden")) {
+        closeCaptureModal();
+        return;
+      }
+      const watchModal = document.getElementById("watch-modal");
+      if (watchModal && !watchModal.classList.contains("hidden")) {
+        closeWatchModal();
+        return;
+      }
+      const readerTab = document.getElementById("tab-reader");
+      if (readerTab && !readerTab.classList.contains("hidden")) {
+        switchTab("library");
+      }
+    }
   });
 
   // Background polling every 15s when active tab is visible
@@ -876,6 +901,25 @@ function openReaderForVideo(videoId) {
   renderReaderView(vid);
 }
 
+function renderMathSafely(container) {
+  if (!container) return;
+  if (typeof renderMathInElement === "function") {
+    try {
+      renderMathInElement(container, {
+        delimiters: [
+          { left: "$$", right: "$$", display: true },
+          { left: "\\[", right: "\\]", display: true },
+          { left: "\\(", right: "\\)", display: false },
+          { left: "$", right: "$", display: false }
+        ],
+        throwOnError: false
+      });
+    } catch (e) {
+      console.warn("KaTeX render error:", e);
+    }
+  }
+}
+
 let currentReaderMode = "rapid"; // "rapid" (5-min recall) or "indepth" (long-form reader)
 
 function switchReaderMode(mode) {
@@ -905,6 +949,7 @@ function switchReaderMode(mode) {
     }
   }
   if (window.lucide) lucide.createIcons();
+  renderMathSafely(document.getElementById("reader-content"));
 }
 
 function formatTimestampToSeconds(label) {
@@ -1003,22 +1048,27 @@ function renderReaderView(video) {
     if (formulasGrid) {
       formulasGrid.innerHTML = formulas.map((f, i) => {
         const jumpUrl = `https://www.youtube.com/watch?v=${video.video_id}&t=${formatTimestampToSeconds(f.timestamp_label)}s`;
-        const tex = f.formula_latex || f.formula || "";
+        let tex = (f.formula_latex || f.formula || "").trim();
+        if (tex.startsWith("$$") && tex.endsWith("$$")) {
+          tex = tex.slice(2, -2).trim();
+        } else if (tex.startsWith("$") && tex.endsWith("$")) {
+          tex = tex.slice(1, -1).trim();
+        }
         return `
           <div class="bg-obsidian-950 border border-obsidian-800 rounded-xl p-4 sm:p-5 space-y-3 relative hover:border-amber-500/40 transition-colors group shadow-sm">
             <div class="flex items-center justify-between gap-2 border-b border-obsidian-800/80 pb-2.5">
               <div class="flex items-center gap-2">
                 <span class="w-6 h-6 rounded-md bg-amber-500/10 text-amber-400 text-xs font-mono font-bold flex items-center justify-center border border-amber-500/20">#${i + 1}</span>
-                <h4 class="font-semibold text-xs sm:text-sm text-zinc-100 tracking-tight">${f.name || 'Key Formula'}</h4>
+                <h4 class="font-semibold text-xs sm:text-sm text-zinc-100 tracking-tight">${escapeHtml(f.name || 'Key Formula')}</h4>
               </div>
               <a href="${jumpUrl}" target="_blank" class="inline-flex items-center gap-1 px-2.5 py-1 rounded text-[11px] font-mono bg-obsidian-850 hover:bg-obsidian-800 text-amber-400 border border-amber-500/20 transition-colors">
                 <i data-lucide="play" class="w-2.5 h-2.5 fill-current"></i>
-                <span>${f.timestamp_label || '00:00'}</span>
+                <span>${escapeHtml(f.timestamp_label || '00:00')}</span>
               </a>
             </div>
 
             <div class="bg-obsidian-900/90 rounded-lg p-3 sm:p-4 text-center text-amber-200 font-mono text-sm sm:text-base border border-obsidian-800 overflow-x-auto selection:bg-amber-500 selection:text-black">
-              ${tex.startsWith("$$") ? tex : `$$${tex}$$`}
+              $$${tex}$$
             </div>
 
             ${f.variables ? `
@@ -1211,25 +1261,9 @@ function renderReaderView(video) {
     }
   }
 
-  // Ensure current mode is displayed
+  // Ensure current mode is displayed and math is rendered
   switchReaderMode(currentReaderMode);
-
-  // Render Math equations via KaTeX if available
-  if (window.renderMathInElement) {
-    try {
-      renderMathInElement(document.getElementById("reader-content"), {
-        delimiters: [
-          { left: "$$", right: "$$", display: true },
-          { left: "\\[", right: "\\]", display: true },
-          { left: "\\(", right: "\\)", display: false },
-          { left: "$", right: "$", display: false }
-        ],
-        throwOnError: false
-      });
-    } catch (e) {
-      console.warn("KaTeX rendering warning:", e);
-    }
-  }
+  renderMathSafely(document.getElementById("reader-content"));
 
   if (window.lucide) lucide.createIcons();
 }
