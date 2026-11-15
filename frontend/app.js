@@ -42,6 +42,283 @@ function apiUrl(path) {
   return base ? `${base}${path.startsWith('/') ? path : '/' + path}` : path;
 }
 
+// Phase 1: Authentication & Multi-Tenancy JWT Management
+const AUTH_TOKEN_KEY = "recall_auth_token";
+let currentUser = null;
+
+function setCurrentUser(user) {
+  currentUser = user;
+  if (typeof window !== "undefined") {
+    window.currentUser = user;
+  }
+}
+
+function getAuthToken() {
+  try {
+    return localStorage.getItem(AUTH_TOKEN_KEY) || "";
+  } catch (e) {
+    return "";
+  }
+}
+
+function setAuthToken(token) {
+  try {
+    if (token) {
+      localStorage.setItem(AUTH_TOKEN_KEY, token);
+    } else {
+      localStorage.removeItem(AUTH_TOKEN_KEY);
+    }
+  } catch (e) {}
+}
+
+function authHeaders(extraHeaders = {}) {
+  const headers = { ...extraHeaders };
+  const token = getAuthToken();
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+  return headers;
+}
+
+async function authFetch(url, options = {}) {
+  const opts = { ...options };
+  opts.headers = authHeaders(opts.headers || {});
+  try {
+    const res = await fetch(url, opts);
+    if (res.status === 401 && getAuthToken()) {
+      console.warn("Session expired or token invalid. Clearing auth token.");
+      setAuthToken("");
+      currentUser = null;
+      updateAuthUiState();
+    }
+    return res;
+  } catch (err) {
+    throw err;
+  }
+}
+
+async function checkAuthState() {
+  const token = getAuthToken();
+  if (!token) {
+    currentUser = null;
+    updateAuthUiState();
+    return;
+  }
+  try {
+    const res = await authFetch(apiUrl("/api/auth/me"));
+    if (res.ok) {
+      currentUser = await res.json();
+    } else {
+      currentUser = null;
+      setAuthToken("");
+    }
+  } catch (e) {
+    console.warn("Auth check notice:", e);
+  }
+  updateAuthUiState();
+}
+
+function updateAuthUiState() {
+  const navLabel = document.getElementById("nav-user-label");
+  const badge = document.getElementById("account-status-badge");
+  const loggedInBox = document.getElementById("account-logged-in-box");
+  const loggedOutBox = document.getElementById("account-logged-out-box");
+  const userNameEl = document.getElementById("account-user-name");
+  const userEmailEl = document.getElementById("account-user-email");
+  const initialsEl = document.getElementById("account-avatar-initials");
+
+  if (currentUser && currentUser.id !== 1) {
+    const name = currentUser.full_name || currentUser.email.split("@")[0];
+    const initial = name.charAt(0).toUpperCase();
+
+    if (navLabel) navLabel.textContent = name.length > 12 ? name.slice(0, 10) + "…" : name;
+    if (badge) {
+      badge.textContent = "Private Tenant Workspace";
+      badge.className = "px-2.5 py-0.5 rounded-full text-[10px] font-mono bg-emerald-500/10 text-emerald-400 border border-emerald-500/20";
+    }
+    if (loggedInBox) loggedInBox.classList.remove("hidden");
+    if (loggedOutBox) loggedOutBox.classList.add("hidden");
+    if (userNameEl) userNameEl.textContent = name;
+    if (userEmailEl) userEmailEl.textContent = currentUser.email;
+    if (initialsEl) initialsEl.textContent = initial;
+  } else {
+    if (navLabel) navLabel.textContent = "Account";
+    if (badge) {
+      badge.textContent = "Guest Workspace";
+      badge.className = "px-2.5 py-0.5 rounded-full text-[10px] font-mono bg-zinc-800 text-zinc-400 border border-zinc-700";
+    }
+    if (loggedInBox) loggedInBox.classList.add("hidden");
+    if (loggedOutBox) loggedOutBox.classList.remove("hidden");
+  }
+  if (window.lucide && typeof window.lucide.createIcons === "function") {
+    window.lucide.createIcons();
+  }
+}
+
+function openAuthModal(defaultMode = "login") {
+  const modal = document.getElementById("auth-modal");
+  if (!modal) return;
+  modal.classList.remove("hidden");
+
+  const feedback = document.getElementById("auth-feedback");
+  if (feedback) feedback.classList.add("hidden");
+
+  if (currentUser && currentUser.id !== 1) {
+    document.getElementById("auth-tabs-row")?.classList.add("hidden");
+    document.getElementById("auth-login-form")?.classList.add("hidden");
+    document.getElementById("auth-register-form")?.classList.add("hidden");
+    const profileForm = document.getElementById("auth-profile-form");
+    if (profileForm) profileForm.classList.remove("hidden");
+    const name = currentUser.full_name || currentUser.email.split("@")[0];
+    const nameEl = document.getElementById("auth-modal-name");
+    const emailEl = document.getElementById("auth-modal-email");
+    const avatarEl = document.getElementById("auth-modal-avatar");
+    const titleEl = document.getElementById("auth-modal-title");
+    if (nameEl) nameEl.textContent = name;
+    if (emailEl) emailEl.textContent = currentUser.email;
+    if (avatarEl) avatarEl.textContent = name.charAt(0).toUpperCase();
+    if (titleEl) titleEl.textContent = "Account Profile";
+  } else {
+    document.getElementById("auth-tabs-row")?.classList.remove("hidden");
+    document.getElementById("auth-profile-form")?.classList.add("hidden");
+    const titleEl = document.getElementById("auth-modal-title");
+    if (titleEl) titleEl.textContent = "Account Access";
+    switchAuthTab(defaultMode);
+  }
+}
+
+function closeAuthModal() {
+  const modal = document.getElementById("auth-modal");
+  if (modal) modal.classList.add("hidden");
+}
+
+function switchAuthTab(tab) {
+  const loginTabBtn = document.getElementById("auth-tab-login");
+  const regTabBtn = document.getElementById("auth-tab-register");
+  const loginForm = document.getElementById("auth-login-form");
+  const regForm = document.getElementById("auth-register-form");
+  const feedback = document.getElementById("auth-feedback");
+  if (feedback) feedback.classList.add("hidden");
+
+  if (tab === "register") {
+    loginTabBtn?.classList.remove("bg-obsidian-800", "text-zinc-100");
+    loginTabBtn?.classList.add("text-zinc-400");
+    regTabBtn?.classList.add("bg-obsidian-800", "text-zinc-100");
+    regTabBtn?.classList.remove("text-zinc-400");
+    loginForm?.classList.add("hidden");
+    regForm?.classList.remove("hidden");
+  } else {
+    regTabBtn?.classList.remove("bg-obsidian-800", "text-zinc-100");
+    regTabBtn?.classList.add("text-zinc-400");
+    loginTabBtn?.classList.add("bg-obsidian-800", "text-zinc-100");
+    loginTabBtn?.classList.remove("text-zinc-400");
+    regForm?.classList.add("hidden");
+    loginForm?.classList.remove("hidden");
+  }
+}
+
+async function submitLogin() {
+  const emailInput = document.getElementById("auth-login-email");
+  const pwInput = document.getElementById("auth-login-password");
+  const email = emailInput?.value.trim();
+  const password = pwInput?.value.trim();
+
+  if (!email || !password) {
+    showAuthError("Please enter your email and password.");
+    return;
+  }
+
+  const btn = document.getElementById("btn-submit-login");
+  if (btn) btn.disabled = true;
+
+  try {
+    const res = await fetch(apiUrl("/api/auth/login"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password })
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      showAuthError(data.detail || "Login failed. Check credentials.");
+      return;
+    }
+    setAuthToken(data.access_token);
+    currentUser = data.user;
+    updateAuthUiState();
+    closeAuthModal();
+    showToastNotification(`Welcome back, ${currentUser.full_name || currentUser.email}!`, "success");
+    if (typeof loadVideos === "function") loadVideos();
+    if (typeof loadStats === "function") loadStats();
+  } catch (e) {
+    showAuthError("Network error during login: " + e.message);
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+async function submitRegister() {
+  const nameInput = document.getElementById("auth-register-name");
+  const emailInput = document.getElementById("auth-register-email");
+  const pwInput = document.getElementById("auth-register-password");
+  const full_name = nameInput?.value.trim() || "";
+  const email = emailInput?.value.trim();
+  const password = pwInput?.value.trim();
+
+  if (!email || !password) {
+    showAuthError("Please fill in email and password.");
+    return;
+  }
+  if (password.length < 6) {
+    showAuthError("Password must be at least 6 characters.");
+    return;
+  }
+
+  const btn = document.getElementById("btn-submit-register");
+  if (btn) btn.disabled = true;
+
+  try {
+    const res = await fetch(apiUrl("/api/auth/register"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password, full_name })
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      showAuthError(data.detail || "Registration failed.");
+      return;
+    }
+    setAuthToken(data.access_token);
+    currentUser = data.user;
+    updateAuthUiState();
+    closeAuthModal();
+    showToastNotification(`Account created! Welcome, ${currentUser.full_name || currentUser.email}!`, "success");
+    if (typeof loadVideos === "function") loadVideos();
+    if (typeof loadStats === "function") loadStats();
+  } catch (e) {
+    showAuthError("Network error during registration: " + e.message);
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+function showAuthError(msg) {
+  const feedback = document.getElementById("auth-feedback");
+  if (!feedback) return;
+  feedback.textContent = msg;
+  feedback.className = "mt-3 p-2.5 rounded-lg text-xs font-medium bg-rose-500/10 text-rose-400 border border-rose-500/20";
+  feedback.classList.remove("hidden");
+}
+
+function logoutUser() {
+  setAuthToken("");
+  currentUser = null;
+  updateAuthUiState();
+  closeAuthModal();
+  showToastNotification("Signed out. Switched to Guest Workspace.", "info");
+  if (typeof loadVideos === "function") loadVideos();
+  if (typeof loadStats === "function") loadStats();
+}
+
 // Persistent Local Phone Storage Store
 const LOCAL_VIDEOS_KEY = "recall_local_videos_store";
 const LOCAL_FLASHCARDS_KEY = "recall_local_flashcards_store";
@@ -480,6 +757,7 @@ function handleSortChange() {
 
 document.addEventListener("DOMContentLoaded", async () => {
   try { if (window.lucide) lucide.createIcons(); } catch (e) { console.error("Lucide init error", e); }
+  try { await checkAuthState(); } catch (e) { console.error("checkAuthState error", e); }
   try { await loadVideos(); } catch (e) { console.error("loadVideos error", e); }
   try { await loadStats(); } catch (e) { console.error("loadStats error", e); }
   try { await loadSettings(); } catch (e) { console.error("loadSettings error", e); }
@@ -613,8 +891,8 @@ async function loadStats() {
   if (hasServerBackend()) {
     try {
       const [vidRes, statRes] = await Promise.all([
-        fetch(apiUrl("/api/videos")),
-        fetch(apiUrl("/api/flashcards/stats"))
+        authFetch(apiUrl("/api/videos")),
+        authFetch(apiUrl("/api/flashcards/stats"))
       ]);
 
       if (vidRes.ok && statRes.ok) {
@@ -695,7 +973,7 @@ async function loadVideos() {
 
   if (hasServerBackend()) {
     try {
-      const res = await fetch(apiUrl(`/api/videos?sort_by=${encodeURIComponent(currentSort)}`));
+      const res = await authFetch(apiUrl(`/api/videos?sort_by=${encodeURIComponent(currentSort)}`));
       if (res.ok) {
         serverVideos = await res.json();
       }
@@ -745,7 +1023,7 @@ async function autoIntakeSharedVideo(videoId) {
 
   if (hasServerBackend()) {
     try {
-      const res = await fetch(apiUrl("/api/videos/intake"), {
+      const res = await authFetch(apiUrl("/api/videos/intake"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1448,7 +1726,7 @@ async function redistillCurrentVideo() {
         renderReaderView(updated);
       }
     } else {
-      const res = await fetch(apiUrl(`/api/videos/${currentViewingVideo.id}/redistill`), { method: "POST" });
+      const res = await authFetch(apiUrl(`/api/videos/${currentViewingVideo.id}/redistill`), { method: "POST" });
       if (!res.ok) throw new Error("Failed to re-distill transcript");
       const data = await res.json();
       currentViewingVideo = data;
@@ -1485,7 +1763,7 @@ async function deleteVideoById(videoId) {
   // Try server delete if backend available and not a purely local ID
   if (hasServerBackend() && !strId.startsWith("local_")) {
     try {
-      await fetch(apiUrl(`/api/videos/${videoId}`), { method: "DELETE" });
+      await authFetch(apiUrl(`/api/videos/${videoId}`), { method: "DELETE" });
     } catch (e) {
       console.warn("Server delete warning:", e);
     }
@@ -1547,7 +1825,7 @@ async function submitVideoIntake() {
   let succeeded = false;
   if (hasServerBackend()) {
     try {
-      const res = await fetch(apiUrl("/api/videos/intake"), {
+      const res = await authFetch(apiUrl("/api/videos/intake"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1613,7 +1891,7 @@ async function loadSettings() {
 
   if (!storedKey && hasServerBackend()) {
     try {
-      const res = await fetch(apiUrl("/api/settings/gemini-key"));
+      const res = await authFetch(apiUrl("/api/settings/gemini-key"));
       if (res.ok) {
         const data = await res.json();
         if (data.api_key) {
@@ -1694,7 +1972,7 @@ async function saveAndTestGeminiKey() {
   // If server backend is connected, also save it to server
   if (hasServerBackend()) {
     try {
-      await fetch(apiUrl("/api/settings"), {
+      await authFetch(apiUrl("/api/settings"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ settings: { GEMINI_API_KEY: key, DEFAULT_AI_PROVIDER: "gemini" } })
@@ -1764,7 +2042,7 @@ async function saveSettings() {
 
   if (hasServerBackend()) {
     try {
-      const res = await fetch(apiUrl("/api/settings"), {
+      const res = await authFetch(apiUrl("/api/settings"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
@@ -1803,7 +2081,7 @@ async function copyCurrentOrigin() {
 async function loadAccountStatus() {
   if (!hasServerBackend()) return;
   try {
-    const res = await fetch(apiUrl("/api/youtube/status"));
+    const res = await authFetch(apiUrl("/api/youtube/status"));
     if (!res.ok) return;
     const data = await res.json();
 
@@ -1882,7 +2160,7 @@ async function startFlashcardSession(filterVideoId = null) {
   if (hasServerBackend()) {
     try {
       let url = filterVideoId ? `/api/flashcards/all?limit=100` : "/api/flashcards/due";
-      const res = await fetch(apiUrl(url));
+      const res = await authFetch(apiUrl(url));
       if (res.ok) {
         cards = await res.json();
         loadedFromServer = true;
@@ -1937,7 +2215,7 @@ async function loadAllCardsSession() {
 
   if (hasServerBackend()) {
     try {
-      const res = await fetch(apiUrl("/api/flashcards/all?limit=100"));
+      const res = await authFetch(apiUrl("/api/flashcards/all?limit=100"));
       if (res.ok) {
         cards = await res.json();
         loadedFromServer = true;
@@ -2045,7 +2323,7 @@ async function rateCurrentCard(rating) {
 
   if (hasServerBackend()) {
     try {
-      await fetch(apiUrl(`/api/flashcards/${card.id}/review`), {
+      await authFetch(apiUrl(`/api/flashcards/${card.id}/review`), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -2117,7 +2395,16 @@ function downloadReaderAnki() {
   const vid = currentViewingVideo;
 
   if (hasServerBackend()) {
-    window.location.href = apiUrl(`/api/export/anki/${vid.id}/download`);
+    authFetch(apiUrl(`/api/export/anki/${vid.id}/download`))
+      .then(r => {
+        if (!r.ok) throw new Error("Export download failed");
+        return r.blob();
+      })
+      .then(blob => downloadBlob(blob, `${(vid.title || 'flashcards').replace(/[^a-zA-Z0-9_-]/g, '_')}_anki.tsv`))
+      .catch(e => {
+        console.warn("Server download notice:", e);
+        window.location.href = apiUrl(`/api/export/anki/${vid.id}/download`);
+      });
     return;
   }
 
@@ -2137,7 +2424,16 @@ function downloadMarkdownById(videoId) {
   if (!vid) return;
 
   if (hasServerBackend()) {
-    window.location.href = apiUrl(`/api/export/obsidian/${vid.id}/download`);
+    authFetch(apiUrl(`/api/export/obsidian/${vid.id}/download`))
+      .then(r => {
+        if (!r.ok) throw new Error("Obsidian download failed");
+        return r.blob();
+      })
+      .then(blob => downloadBlob(blob, `${(vid.title || 'study_notes').replace(/[^a-zA-Z0-9_-]/g, '_')}.md`))
+      .catch(e => {
+        console.warn("Server download notice:", e);
+        window.location.href = apiUrl(`/api/export/obsidian/${vid.id}/download`);
+      });
     return;
   }
 

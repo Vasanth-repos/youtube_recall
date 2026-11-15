@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import desc, func
 
 from backend.app.database import get_db
-from backend.app.models import Video, Flashcard, AppSetting
+from backend.app.models import Video, Flashcard, AppSetting, User
 from backend.app.schemas import (
     VideoIntakeRequest,
     VideoResponse,
@@ -17,6 +17,7 @@ from backend.app.schemas import (
 from backend.app.services.youtube_service import YouTubeService
 from backend.app.services.classifier_service import ClassifierService
 from backend.app.services.ai_service import AIService
+from backend.app.services.auth_service import get_current_user_optional
 from backend.app.config import settings
 
 logger = logging.getLogger(__name__)
@@ -25,10 +26,12 @@ router = APIRouter(prefix="/api/videos", tags=["Videos"])
 def utcnow():
     return datetime.now(timezone.utc)
 
-def process_video_pipeline(db: Session, video_req: VideoIntakeRequest) -> Video:
+def process_video_pipeline(db: Session, video_req: VideoIntakeRequest, user: Optional[User] = None) -> Video:
     raw_id = YouTubeService.extract_video_id(video_req.video_url_or_id)
     if not raw_id:
         raise HTTPException(status_code=400, detail="Invalid YouTube URL or Video ID provided.")
+
+    target_user_id = user.id if user else 1
 
     # Parse watched_at
     watched_at_dt = utcnow()
@@ -41,8 +44,12 @@ def process_video_pipeline(db: Session, video_req: VideoIntakeRequest) -> Video:
         except Exception:
             watched_at_dt = utcnow()
 
-    # 1. Deduplication check
-    existing = db.query(Video).filter(Video.video_id == raw_id).first()
+    # 1. Deduplication check (scoped to this user or default workspace)
+    existing = db.query(Video).filter(
+        Video.video_id == raw_id,
+        (Video.user_id == target_user_id) | (Video.user_id.is_(None) if target_user_id == 1 else False)
+    ).first()
+
     if existing and existing.status == "PROCESSED" and not video_req.force_process:
         existing.last_watched_at = watched_at_dt
         if video_req.watch_time_seconds and video_req.watch_time_seconds > existing.watch_time_seconds:
@@ -107,6 +114,7 @@ def process_video_pipeline(db: Session, video_req: VideoIntakeRequest) -> Video:
 
     # 7. Persist or Update Video in DB
     video_record = existing or Video(video_id=raw_id)
+    video_record.user_id = target_user_id
     video_record.title = meta["title"]
     video_record.channel_title = meta["channel_title"]
     video_record.channel_id = meta.get("channel_id", "")
@@ -144,6 +152,7 @@ def process_video_pipeline(db: Session, video_req: VideoIntakeRequest) -> Video:
     generated_cards = recall_data.get("flashcards", [])
     for card_data in generated_cards:
         card = Flashcard(
+            user_id=target_user_id,
             video_id=video_record.id,
             question=card_data.get("question", "Recall question"),
             answer=card_data.get("answer", "Answer"),
@@ -163,16 +172,26 @@ def process_video_pipeline(db: Session, video_req: VideoIntakeRequest) -> Video:
     return video_record
 
 @router.post("/intake", response_model=VideoResponse)
-def intake_video(payload: VideoIntakeRequest, db: Session = Depends(get_db)):
+def intake_video(
+    payload: VideoIntakeRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user_optional)
+):
     """Receives YouTube video ID/URL, validates, transcribes, classifies, and synthesizes study material."""
-    return process_video_pipeline(db, payload)
+    return process_video_pipeline(db, payload, user=current_user)
 
 @router.post("/sync-history", response_model=YouTubeHistorySyncResponse)
-def sync_youtube_history(payload: YouTubeHistorySyncRequest, db: Session = Depends(get_db)):
+def sync_youtube_history(
+    payload: YouTubeHistorySyncRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user_optional)
+):
     """
     Batch synchronizes YouTube watch history items from linked account / browser extension.
     Automatically filters duplicates and distills transcripts for new videos.
     """
+    target_user_id = current_user.id if current_user else 1
+
     # 1. Update linked account metadata if provided
     if payload.account_name or payload.account_email:
         email = payload.account_email or settings.YOUTUBE_ACCOUNT_EMAIL or ""
@@ -198,12 +217,14 @@ def sync_youtube_history(payload: YouTubeHistorySyncRequest, db: Session = Depen
     already_synced = 0
     synced_titles = []
 
+    user_filter = (Video.user_id == target_user_id) | (Video.user_id.is_(None) if target_user_id == 1 else False)
+
     for item in payload.items:
         raw_id = YouTubeService.extract_video_id(item.video_url_or_id)
         if not raw_id:
             continue
 
-        existing = db.query(Video).filter(Video.video_id == raw_id).first()
+        existing = db.query(Video).filter(Video.video_id == raw_id, user_filter).first()
         if existing and existing.status == "PROCESSED":
             if item.watched_at:
                 try:
@@ -226,7 +247,7 @@ def sync_youtube_history(payload: YouTubeHistorySyncRequest, db: Session = Depen
                 force_process=True,
                 watched_at=item.watched_at
             )
-            vid = process_video_pipeline(db, req)
+            vid = process_video_pipeline(db, req, user=current_user)
             newly_synced += 1
             synced_titles.append(vid.title)
         except Exception as e:
@@ -248,10 +269,12 @@ def list_videos(
     sort_by: Optional[str] = Query("recently_watched", description="Sort: recently_watched, newest, title, duration"),
     skip: int = 0,
     limit: int = 50,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user_optional)
 ):
     """Lists saved videos with optional filtering, search, and sorting (recently_watched, newest, title, duration)."""
-    q = db.query(Video)
+    user_filter = (Video.user_id == current_user.id) | (Video.user_id.is_(None) if current_user.id == 1 else False)
+    q = db.query(Video).filter(user_filter)
     if status:
         q = q.filter(Video.status == status)
     if category:
@@ -271,21 +294,31 @@ def list_videos(
     return q.offset(skip).limit(limit).all()
 
 @router.get("/{id_or_video_id}", response_model=VideoResponse)
-def get_video(id_or_video_id: str, db: Session = Depends(get_db)):
-    """Retrieves a single video by database ID or YouTube 11-char ID."""
+def get_video(
+    id_or_video_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user_optional)
+):
+    """Retrieves a single video by database ID or YouTube 11-char ID scoped to current user."""
+    user_filter = (Video.user_id == current_user.id) | (Video.user_id.is_(None) if current_user.id == 1 else False)
     if id_or_video_id.isdigit():
-        vid = db.query(Video).filter(Video.id == int(id_or_video_id)).first()
+        vid = db.query(Video).filter(Video.id == int(id_or_video_id), user_filter).first()
     else:
-        vid = db.query(Video).filter(Video.video_id == id_or_video_id).first()
+        vid = db.query(Video).filter(Video.video_id == id_or_video_id, user_filter).first()
     
     if not vid:
         raise HTTPException(status_code=404, detail="Video not found.")
     return vid
 
 @router.post("/{video_id}/redistill", response_model=VideoResponse)
-def redistill_video_transcript(video_id: int, db: Session = Depends(get_db)):
+def redistill_video_transcript(
+    video_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user_optional)
+):
     """Re-distills video transcript with clean AI distillation engine."""
-    vid = db.query(Video).filter(Video.id == video_id).first()
+    user_filter = (Video.user_id == current_user.id) | (Video.user_id.is_(None) if current_user.id == 1 else False)
+    vid = db.query(Video).filter(Video.id == video_id, user_filter).first()
     if not vid:
         raise HTTPException(status_code=404, detail="Video not found.")
 
@@ -310,14 +343,39 @@ def redistill_video_transcript(video_id: int, db: Session = Depends(get_db)):
     vid.laws_and_principles = recall_data.get("laws_and_principles", [])
     vid.rapid_recall = recall_data.get("rapid_recall", {})
 
+    db.query(Flashcard).filter(Flashcard.video_id == vid.id).delete()
+    now = utcnow()
+    generated_cards = recall_data.get("flashcards", [])
+    for card_data in generated_cards:
+        card = Flashcard(
+            user_id=vid.user_id or current_user.id,
+            video_id=vid.id,
+            question=card_data.get("question", "Recall question"),
+            answer=card_data.get("answer", "Answer"),
+            timestamp_seconds=card_data.get("timestamp_seconds", 0),
+            timestamp_label=card_data.get("timestamp_label", "00:00"),
+            step_index=0,
+            interval_days=0,
+            ease_factor=2.5,
+            repetition_count=0,
+            next_review_at=now,
+            status="NEW"
+        )
+        db.add(card)
+
     db.commit()
     db.refresh(vid)
     return vid
 
 @router.delete("/{video_id}")
-def delete_video(video_id: int, db: Session = Depends(get_db)):
+def delete_video(
+    video_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user_optional)
+):
     """Deletes a video and all associated flashcards from the system."""
-    vid = db.query(Video).filter(Video.id == video_id).first()
+    user_filter = (Video.user_id == current_user.id) | (Video.user_id.is_(None) if current_user.id == 1 else False)
+    vid = db.query(Video).filter(Video.id == video_id, user_filter).first()
     if not vid:
         raise HTTPException(status_code=404, detail="Video not found.")
     db.delete(vid)

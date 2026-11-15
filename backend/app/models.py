@@ -7,10 +7,26 @@ from backend.app.database import Base
 def utcnow():
     return datetime.now(timezone.utc)
 
+class User(Base):
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True, index=True)
+    email = Column(String(255), unique=True, index=True, nullable=False)
+    hashed_password = Column(String(255), nullable=False)
+    full_name = Column(String(255), default="")
+    is_active = Column(Boolean, default=True)
+    api_key_gemini = Column(Text, default="")
+    created_at = Column(DateTime, default=utcnow)
+    updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
+
+    videos = relationship("Video", back_populates="user", cascade="all, delete-orphan")
+    flashcards = relationship("Flashcard", back_populates="user", cascade="all, delete-orphan")
+
 class Video(Base):
     __tablename__ = "videos"
 
     id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=True, default=1, index=True)
     video_id = Column(String(32), unique=True, index=True, nullable=False)
     title = Column(String(512), default="Untitled Video")
     channel_title = Column(String(256), default="Unknown Channel")
@@ -41,6 +57,7 @@ class Video(Base):
     updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
     last_watched_at = Column(DateTime, default=utcnow, index=True)
 
+    user = relationship("User", back_populates="videos")
     flashcards = relationship("Flashcard", back_populates="video", cascade="all, delete-orphan")
 
     @property
@@ -136,6 +153,7 @@ class Flashcard(Base):
     __tablename__ = "flashcards"
 
     id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=True, default=1, index=True)
     video_id = Column(Integer, ForeignKey("videos.id", ondelete="CASCADE"), nullable=False)
     question = Column(Text, nullable=False)
     answer = Column(Text, nullable=False)
@@ -153,6 +171,7 @@ class Flashcard(Base):
 
     created_at = Column(DateTime, default=utcnow)
 
+    user = relationship("User", back_populates="flashcards")
     video = relationship("Video", back_populates="flashcards")
     review_logs = relationship("ReviewLog", back_populates="flashcard", cascade="all, delete-orphan")
 

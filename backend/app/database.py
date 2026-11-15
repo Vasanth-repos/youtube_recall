@@ -67,3 +67,38 @@ def init_db():
     except Exception:
         pass
 
+    try:
+        with engine.connect() as conn:
+            conn.execute(__import__("sqlalchemy").text("ALTER TABLE videos ADD COLUMN user_id INTEGER DEFAULT 1"))
+            conn.commit()
+    except Exception:
+        pass
+
+    try:
+        with engine.connect() as conn:
+            conn.execute(__import__("sqlalchemy").text("ALTER TABLE flashcards ADD COLUMN user_id INTEGER DEFAULT 1"))
+            conn.commit()
+    except Exception:
+        pass
+
+    # Ensure default user exists (id=1) for guest / zero-auth backward compatibility
+    try:
+        from backend.app.models import User
+        with SessionLocal() as db:
+            default_user = db.query(User).filter(User.id == 1).first()
+            if not default_user:
+                import bcrypt
+                salt = bcrypt.gensalt(rounds=10)
+                hashed = bcrypt.hashpw(b"guest123", salt).decode('utf-8')
+                guest = User(
+                    id=1,
+                    email="guest@youtuberecall.local",
+                    hashed_password=hashed,
+                    full_name="Default Workspace",
+                    is_active=True
+                )
+                db.add(guest)
+                db.commit()
+    except Exception:
+        pass
+

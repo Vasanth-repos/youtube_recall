@@ -26,7 +26,10 @@ function createMockElement(id, tag = 'div') {
     setAttribute(k, v) { this.attributes[k] = v; },
     getAttribute(k) { return this.attributes[k] || null; },
     addEventListener(evt, fn) {},
-    querySelectorAll(sel) { return []; }
+    querySelectorAll(sel) { return []; },
+    appendChild(c) {},
+    removeChild(c) {},
+    remove() {}
   };
 }
 
@@ -44,6 +47,13 @@ global.document = {
       domElements[id] = createMockElement(id);
     }
     return domElements[id];
+  },
+  createElement(tag) {
+    return createMockElement('dyn-' + Math.random(), tag);
+  },
+  body: {
+    appendChild(c) {},
+    removeChild(c) {}
   },
   querySelectorAll(sel) {
     return [];
@@ -174,6 +184,53 @@ async function runVerification() {
     console.log("PASS: Math video correctly selected in Reader!");
   } else {
     console.error("FAIL: Reader title mismatch!");
+  }
+
+  // 4. Test Phase 1 Auth UI Controls
+  console.log("\n4. Testing Phase 1 Auth UI Controls...");
+  openAuthModal('login');
+  const authModal = document.getElementById("auth-modal");
+  if (!authModal.classList.contains("hidden")) {
+    console.log("PASS: openAuthModal() successfully opened auth modal!");
+  } else {
+    console.error("FAIL: auth-modal still has 'hidden' class!");
+  }
+
+  switchAuthTab('register');
+  const regForm = document.getElementById("auth-register-form");
+  const loginForm = document.getElementById("auth-login-form");
+  if (!regForm.classList.contains("hidden") && loginForm.classList.contains("hidden")) {
+    console.log("PASS: switchAuthTab('register') toggled form views properly!");
+  } else {
+    console.error("FAIL: switchAuthTab failed to toggle properly!");
+  }
+
+  closeAuthModal();
+  if (authModal.classList.contains("hidden")) {
+    console.log("PASS: closeAuthModal() closed modal properly!");
+  } else {
+    console.error("FAIL: closeAuthModal did not add 'hidden' class!");
+  }
+
+  // Test authenticated state UI rendering
+  setCurrentUser({ id: 99, full_name: "Dr. Elena Vance", email: "elena@vance.edu" });
+  updateAuthUiState();
+  const navLabel = document.getElementById("nav-user-label").textContent;
+  const badgeText = document.getElementById("account-status-badge").textContent;
+  if (navLabel.includes("Elena") && badgeText.includes("Private Tenant")) {
+    console.log("PASS: Authenticated user state rendered in navbar & settings badge!");
+  } else {
+    console.error(`FAIL: Auth UI rendering mismatch (navLabel: ${navLabel}, badge: ${badgeText})`);
+  }
+
+  // Test logout
+  logoutUser();
+  const navLabelAfter = document.getElementById("nav-user-label").textContent;
+  const badgeTextAfter = document.getElementById("account-status-badge").textContent;
+  if (navLabelAfter === "Account" && badgeTextAfter.includes("Guest Workspace")) {
+    console.log("PASS: logoutUser() cleanly restored Guest Workspace mode!");
+  } else {
+    console.error(`FAIL: Logout reset mismatch (navLabel: ${navLabelAfter}, badge: ${badgeTextAfter})`);
   }
 
   console.log("\nALL FRONTEND DOM SIMULATION TESTS COMPLETED SUCCESSFULLY!");

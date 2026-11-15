@@ -143,3 +143,32 @@ class YouTubeHistorySyncResponse(BaseModel):
     synced_titles: List[str] = []
     message: str
 
+# Authentication Schemas (Phase 1)
+class UserRegisterRequest(BaseModel):
+    email: str = Field(..., description="User email address")
+    password: str = Field(..., min_length=6, description="Password (at least 6 characters)")
+    full_name: Optional[str] = Field("", description="Full name or display name")
+
+class UserLoginRequest(BaseModel):
+    email: str = Field(..., description="User email address")
+    password: str = Field(..., description="Password")
+
+class UserResponse(BaseModel):
+    id: int
+    email: str
+    full_name: Optional[str] = ""
+    is_active: bool = True
+    created_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    user: UserResponse
+
+class UserProfileUpdateRequest(BaseModel):
+    full_name: Optional[str] = None
+    api_key_gemini: Optional[str] = None
+

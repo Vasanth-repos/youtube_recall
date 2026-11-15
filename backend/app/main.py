@@ -1,12 +1,15 @@
 import os
+import time
+import threading
+from collections import defaultdict
 from pathlib import Path
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 
 from backend.app.database import init_db
-from backend.app.routers import videos, flashcards, export, settings, youtube_auth
+from backend.app.routers import videos, flashcards, export, settings, youtube_auth, auth
 from backend.app.config import settings as app_settings
 
 # Initialize DB tables
@@ -18,10 +21,16 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# CORS enabled for Chrome Extension (chrome-extension://*) and local dev
+# Parse CORS allowed origins from config
+raw_origins = getattr(app_settings, "ALLOWED_ORIGINS", "*")
+if raw_origins == "*":
+    allowed_origins = ["*"]
+else:
+    allowed_origins = [o.strip() for o in raw_origins.split(",") if o.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -34,7 +43,49 @@ async def add_private_network_headers(request, call_next):
     response.headers["Access-Control-Allow-Private-Network"] = "true"
     return response
 
+# In-memory sliding-window rate limiter for sensitive endpoints
+rate_limit_lock = threading.Lock()
+request_history = defaultdict(list)
+
+RATE_LIMIT_RULES = {
+    "/api/auth/login": (getattr(app_settings, "RATE_LIMIT_AUTH_PER_MINUTE", 60), 60),
+    "/api/auth/register": (getattr(app_settings, "RATE_LIMIT_AUTH_PER_MINUTE", 60), 60),
+    "/api/videos/intake": (getattr(app_settings, "RATE_LIMIT_INTAKE_PER_MINUTE", 30), 60),
+}
+
+@app.middleware("http")
+async def sliding_window_rate_limiter(request: Request, call_next):
+    path = request.url.path
+    matched_rule = None
+    for prefix, rule in RATE_LIMIT_RULES.items():
+        if path == prefix or path.startswith(prefix + "/"):
+            matched_rule = (prefix, rule[0], rule[1])
+            break
+
+    if matched_rule and request.method in ["POST", "PUT"]:
+        prefix, max_requests, window_seconds = matched_rule
+        forwarded = request.headers.get("X-Forwarded-For")
+        client_ip = forwarded.split(",")[0].strip() if forwarded else (request.client.host if request.client else "127.0.0.1")
+        key = f"{client_ip}:{prefix}"
+        now = time.time()
+
+        with rate_limit_lock:
+            cutoff = now - window_seconds
+            timestamps = [t for t in request_history[key] if t > cutoff]
+            if len(timestamps) >= max_requests:
+                retry_after = max(1, int(window_seconds - (now - timestamps[0])))
+                return JSONResponse(
+                    status_code=429,
+                    content={"detail": f"Rate limit exceeded. Please wait {retry_after}s before trying again."},
+                    headers={"Retry-After": str(retry_after)}
+                )
+            timestamps.append(now)
+            request_history[key] = timestamps
+
+    return await call_next(request)
+
 # Include API Routers
+app.include_router(auth.router)
 app.include_router(videos.router)
 app.include_router(flashcards.router)
 app.include_router(export.router)

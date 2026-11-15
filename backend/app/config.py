@@ -16,6 +16,14 @@ class AppConfig:
     HOST: str = os.getenv("HOST", "0.0.0.0")
     PORT: int = int(os.getenv("PORT", "8000"))
 
+    # Security & Authentication (Phase 1)
+    JWT_SECRET_KEY: str = os.getenv("JWT_SECRET_KEY", "youtube-recall-secure-jwt-production-secret-key-2026")
+    JWT_ALGORITHM: str = os.getenv("JWT_ALGORITHM", "HS256")
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "10080")) # 7 days
+    ALLOWED_ORIGINS: str = os.getenv("ALLOWED_ORIGINS", "*")
+    RATE_LIMIT_AUTH_PER_MINUTE: int = int(os.getenv("RATE_LIMIT_AUTH_PER_MINUTE", "60"))
+    RATE_LIMIT_INTAKE_PER_MINUTE: int = int(os.getenv("RATE_LIMIT_INTAKE_PER_MINUTE", "30"))
+
     # AI Configuration (Free tiers supported)
     GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
     DEFAULT_AI_PROVIDER: str = os.getenv("DEFAULT_AI_PROVIDER", "gemini" if os.getenv("GEMINI_API_KEY") else "local_offline") # "gemini", "groq", "ollama", "local_offline"
