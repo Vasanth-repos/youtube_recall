@@ -59,11 +59,13 @@ DOMAIN_KEYWORDS = {
         "matrix multiplication", "eigenvalues", "eigenvectors", "theorem", "mathematical proof",
         "geometry", "trigonometry", "statistics", "probability distribution", "combinatorics",
         "discrete mathematics", "laplace transform", "vector calculus", "limit of", "quadratic formula",
+        "complex number", "complex numbers", "imaginary number", "imaginary unit",
         "quantum mechanics", "thermodynamics", "electromagnetism", "astrophysics", "general relativity",
         "special relativity", "cellular respiration", "molecular biology", "organic chemistry",
         "photosynthesis", "genetics", "dna replication", "neuroscience", "periodic table",
         "chemical reaction", "newton's laws", "conservation of energy", "optics", "fluid dynamics",
-        "physics", "chemistry", "biology", "mathematics", "essence of calculus", "essence of linear algebra"
+        "physics", "chemistry", "biology", "mathematics", "math", "maths", "class 10", "class 11", "class 12",
+        "ncert", "cbse", "state board", "exercise", "essence of calculus", "essence of linear algebra"
     ],
     "Tech & Engineering": [
         "programming", "tutorial", "crash course", "architecture", "data structures", "algorithms",

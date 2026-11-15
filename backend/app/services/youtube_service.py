@@ -105,27 +105,68 @@ class YouTubeService:
         """
         raw_segments = []
         try:
-            # 1. New API: YouTubeTranscriptApi().fetch(...)
+            api = YouTubeTranscriptApi()
+
+            # 1. Try English transcripts first
             try:
-                api = YouTubeTranscriptApi()
                 if hasattr(api, "fetch"):
-                    fetched = api.fetch(video_id, languages=['en', 'en-US', 'en-GB'])
+                    fetched = api.fetch(video_id, languages=['en', 'en-US', 'en-GB', 'en-IN'])
                     if hasattr(fetched, "snippets"):
                         raw_segments = [
                             {"text": s.text, "start": s.start, "duration": s.duration}
                             for s in fetched.snippets
                         ]
+                    elif isinstance(fetched, list):
+                        raw_segments = fetched
             except Exception:
                 pass
 
-            # 2. Legacy / alternative fallback
-            if not raw_segments:
-                if hasattr(YouTubeTranscriptApi, "get_transcript"):
-                    raw_segments = YouTubeTranscriptApi.get_transcript(video_id, languages=['en', 'en-US', 'en-GB'])
-                elif hasattr(YouTubeTranscriptApi, "list_transcripts"):
-                    t_list = YouTubeTranscriptApi.list_transcripts(video_id)
-                    t = next(iter(t_list))
-                    raw_segments = t.fetch()
+            # 2. Try listing all available transcripts (handles Hindi, Tamil, Telugu, auto-generated, etc.)
+            if not raw_segments and hasattr(api, "list"):
+                try:
+                    t_list = api.list(video_id)
+                    # Prefer English if exists in the list
+                    target = None
+                    for t in t_list:
+                        if t.language_code.startswith("en"):
+                            target = t
+                            break
+                    # Otherwise take the first available transcript in any language
+                    if not target:
+                        target = next(iter(t_list), None)
+
+                    if target:
+                        # Attempt translation to English if translatable
+                        try:
+                            trans = target.translate("en")
+                            fetched = trans.fetch()
+                            raw_segments = [
+                                {"text": s.text, "start": s.start, "duration": s.duration}
+                                for s in fetched.snippets
+                            ] if hasattr(fetched, "snippets") else fetched
+                        except Exception:
+                            # Use native transcript directly (Gemini AI will translate and extract formulas)
+                            fetched = target.fetch()
+                            raw_segments = [
+                                {"text": s.text, "start": s.start, "duration": s.duration}
+                                for s in fetched.snippets
+                            ] if hasattr(fetched, "snippets") else fetched
+                except Exception as e:
+                    logger.warning(f"api.list transcript extraction notice for {video_id}: {e}")
+
+            # 3. Fallback: unconstrained fetch
+            if not raw_segments and hasattr(api, "fetch"):
+                try:
+                    fetched = api.fetch(video_id)
+                    if hasattr(fetched, "snippets"):
+                        raw_segments = [
+                            {"text": s.text, "start": s.start, "duration": s.duration}
+                            for s in fetched.snippets
+                        ]
+                    elif isinstance(fetched, list):
+                        raw_segments = fetched
+                except Exception:
+                    pass
         except Exception as e:
             logger.warning(f"Transcript extraction notice for {video_id}: {e}")
 

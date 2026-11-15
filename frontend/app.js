@@ -102,11 +102,22 @@ function safeParseJson(text) {
     return JSON.parse(cleaned);
   } catch (e) {}
 
+  // Repair LaTeX math escapes: double any backslash NOT followed by " or \
+  try {
+    const repaired = cleaned.replace(/\\(?![\\"])/g, "\\\\");
+    return JSON.parse(repaired);
+  } catch (e) {}
+
   const firstBrace = cleaned.indexOf("{");
   const lastBrace = cleaned.lastIndexOf("}");
   if (firstBrace !== -1 && lastBrace > firstBrace) {
+    const sub = cleaned.substring(firstBrace, lastBrace + 1);
     try {
-      return JSON.parse(cleaned.substring(firstBrace, lastBrace + 1));
+      return JSON.parse(sub);
+    } catch (e) {}
+    try {
+      const repaired = sub.replace(/\\(?![\\"])/g, "\\\\");
+      return JSON.parse(repaired);
     } catch (e) {}
   }
   return null;

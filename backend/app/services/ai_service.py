@@ -11,6 +11,13 @@ logger = logging.getLogger(__name__)
 RECALL_PROMPT_TEMPLATE = """You are a World-Class Technical Educator and Senior Editor (MIT/Stanford caliber).
 Your goal is to transform this raw YouTube spoken transcript into an exceptional 5-MINUTE RAPID RECALL & MICRO-LEARNING CHEAT SHEET.
 
+STRICT INSTRUCTION ON CONCEPTUAL DEPTH AND MATH/SCIENCE REVISION:
+- ABSOLUTELY NEVER output vague meta-descriptions like "Overview of syllabus problems", "Focus on fundamental definitions", or "The video opens with an introduction".
+- INSTEAD, YOU MUST EXPLICITLY STATE THE EXACT MATHEMATICAL/SCIENTIFIC CONCEPTS, THE ACTUAL FORMULAS USED, THE NUMERICAL IDENTITIES, AND THE STEP-BY-STEP PROBLEM-SOLVING RULES.
+- If the video covers Complex Numbers, Calculus, Physics, Chemistry, or Engineering, write out the ACTUAL equations in clean LaTeX notation (e.g. $$i = \\\\sqrt{{-1}}$$, $$i^2 = -1$$, $$i^3 = -i$$, $$i^4 = 1$$, $$i^{{4k+r}} = i^r$$, $$a^m \\\\cdot a^n = a^{{m+n}}$$, etc.).
+- If the transcript is in Hindi, Hinglish, Tamil-English, or mixed spoken language, TRANSLATE AND FORMALIZE THE CONCEPTS INTO CRYSTAL-CLEAR ENGLISH WITH PRECISE MATHEMATICAL NOTATION.
+- In `smart_transcript`, each chapter's `crisp_points` must teach the ACTUAL MATHEMATICAL RULES and SOLVED EXAMPLES (e.g. "To simplify $$i^{{17}}$$, express as $$i^{{16}} \\\\cdot i = (i^4)^4 \\\\cdot i = 1 \\\\cdot i = i$$"), NOT just saying "Exercises are solved".
+
 A student or professional should be able to review this guide in under 5 minutes and immediately recall:
 1. The Core Mental Model / Central Thesis (read in 30 seconds).
 2. The Mathematical Formulas and Equations (if a Math, Physics, or Engineering video) with clean LaTeX syntax, variables glossary, and practical derivation point.
@@ -443,20 +450,37 @@ class AIService:
         except json.JSONDecodeError:
             pass
 
-        # 2. Repair invalid LaTeX / mathematical notation escapes (e.g. \cos, \frac, \sum, \int, \alpha)
+        # 2. Repair LaTeX / math notation: double any backslash NOT followed by " or \
         try:
-            repaired = re.sub(r'\\([^"\\/bfnrtu])', r'\\\\\1', cleaned)
+            repaired = re.sub(r'\\(?![\\"])', r'\\\\', cleaned)
             return json.loads(repaired)
         except json.JSONDecodeError:
             pass
 
-        # 3. Non-strict parse for unescaped control characters
+        # 3. Allow standard escapes (\", \\, \n, \r, \t) and double everything else
         try:
-            repaired = re.sub(r'\\([^"\\/bfnrtu])', r'\\\\\1', cleaned)
-            return json.loads(repaired, strict=False)
-        except Exception as e:
-            logger.warning(f"Failed to parse model JSON: {e}. Raw snippet: {text[:200]}")
-            return None
+            repaired = re.sub(r'\\(?![\\"nrt])', r'\\\\', cleaned)
+            return json.loads(repaired)
+        except json.JSONDecodeError:
+            pass
+
+        # 4. Extract first { to last } substring
+        first_brace = cleaned.find("{")
+        last_brace = cleaned.rfind("}")
+        if first_brace != -1 and last_brace > first_brace:
+            sub = cleaned[first_brace:last_brace + 1]
+            try:
+                return json.loads(sub)
+            except json.JSONDecodeError:
+                pass
+            try:
+                repaired = re.sub(r'\\(?![\\"])', r'\\\\', sub)
+                return json.loads(repaired, strict=False)
+            except Exception:
+                pass
+
+        logger.warning(f"Failed to parse model JSON. Raw snippet: {text[:200]}")
+        return None
 
     @classmethod
     def _local_heuristic_synthesis(
@@ -656,16 +680,21 @@ class AIService:
         laws_and_principles = []
         
         math_patterns = [
-            (r'f\s*\([xXyYzZ]\)|f\'|f\'\'|f\^\(n\)', "Derivative / Functional Approximation", "$$f^{(n)}(x)$$", "Higher-order functional derivation"),
-            (r'(\b\d+!\b|factorial)', "Factorial Scaling Invariant", "$$n! = n(n-1)...1$$", "Counteracts repeated power rule multipliers"),
-            (r'(e\^x|e\^\([^\)]+\))', "Exponential Power Series", "$$e^x = \\sum_{n=0}^{\\infty} \\frac{x^n}{n!}$$", "Standard exponential expansion"),
-            (r'(taylor series|maclaurin)', "Taylor Series General Expansion", "$$P(x) = \\sum_{n=0}^{\\infty} \\frac{f^{(n)}(a)}{n!}(x-a)^n$$", "Polynomial approximation around anchor point a"),
+            (r'(complex number|imaginary unit|\bi\b|root\s*-1|\bi\^2\b)', "Imaginary Unit & Powers of i", "$$i = \\sqrt{-1}, \\quad i^2 = -1, \\quad i^3 = -i, \\quad i^4 = 1$$", "Fundamental imaginary unit definition and cyclical 4-period reduction identity"),
+            (r'(i\^|power of i|i\^\d+|power\s+law|exponent)', "General Power of i Exponent Rule", "$$i^n = i^{4q+r} = (i^4)^q \\cdot i^r = 1^q \\cdot i^r = i^r \\quad (r \\in \\{0, 1, 2, 3\\})$$", "Simplifies any large power of the imaginary unit by computing the exponent remainder modulo 4"),
+            (r'(cartesian form|rectangular form|a\s*\+\s*ib|x\s*\+\s*iy)', "Standard Rectangular Complex Form", "$$z = x + iy \\implies \\text{Re}(z) = x, \\quad \\text{Im}(z) = y$$", "Partitioning of complex quantities into independent orthogonal real and imaginary axes"),
+            (r'(conjugate|modulus|\bar\{?z\}?|\|z\|)', "Complex Conjugate & Modulus Identity", "$$\\bar{z} = x - iy, \\quad |z| = \\sqrt{x^2 + y^2}, \\quad z\\bar{z} = |z|^2$$", "Conjugate reflection across real axis and Euclidean norm magnitude"),
+            (r'f\s*\([xXyYzZ]\)|f\'|f\'\'|f\^\(n\)', "Derivative / Functional Approximation", "$$f^{(n)}(x)$$", "Higher-order functional derivative"),
+            (r'(\b\d+!\b|factorial)', "Factorial Scaling Invariant", "$$n! = n(n-1)...1$$", "Counteracts repeated power rule multipliers in polynomial coefficients"),
+            (r'(e\^x|e\^\([^\)]+\))', "Exponential Power Series", "$$e^x = \\sum_{n=0}^{\\infty} \\frac{x^n}{n!}$$", "Standard infinite series expansion for the exponential function"),
+            (r'(taylor series|maclaurin)', "Taylor Series General Expansion", "$$P(x) = \\sum_{n=0}^{\\infty} \\frac{f^{(n)}(a)}{n!}(x-a)^n$$", "Polynomial approximation constructed around expansion anchor point a"),
+            (r'(quadratic equation|quadratic formula|discriminant)', "Quadratic Formula with Complex Roots", "$$x = \\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a} \\quad (\\text{when } b^2 - 4ac < 0)$$", "Produces conjugate complex root pairs when the discriminant is negative"),
             (r'(\bo\(n\b|\bo\(\w+\))', "Asymptotic Complexity Bound", "$$O(f(n))$$", "Algorithmic resource scaling bound")
         ]
         
-        full_text_lower = transcript_text.lower()
+        full_text_and_title = f"{title} {transcript_text}".lower()
         for pat, fname, ftex, fdesc in math_patterns:
-            m = re.search(pat, transcript_text, re.IGNORECASE)
+            m = re.search(pat, full_text_and_title, re.IGNORECASE)
             if m:
                 ts_lbl = "00:00"
                 if chunks:
@@ -680,7 +709,7 @@ class AIService:
                     "explanation": fdesc,
                     "timestamp_label": ts_lbl
                 })
-                if len(formulas) >= 3:
+                if len(formulas) >= 4:
                     break
 
         science_patterns = [
@@ -692,7 +721,7 @@ class AIService:
             (r'(central dogma|dna|rna)', "Central Dogma of Molecular Biology", "Genetic information flows unidirectionally: DNA -> RNA -> Protein.", "Transcription creates messenger RNA; translation synthesizes functional polypeptides.")
         ]
         for pat, lname, lstmt, lmech in science_patterns:
-            if re.search(pat, full_text_lower):
+            if re.search(pat, full_text_and_title):
                 ts_lbl = "00:00"
                 if chunks:
                     for ch in chunks:
