@@ -134,3 +134,4 @@ def get_current_user_required(
             headers={"WWW-Authenticate": "Bearer"},
         )
     return user
+

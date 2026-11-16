@@ -3,12 +3,15 @@ import time
 import threading
 from collections import defaultdict
 from pathlib import Path
+from fastapi import FastAPI
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from fastapi.responses import FileResponse, JSONResponse
 
 from backend.app.database import init_db
+from backend.app.routers import videos, flashcards, export, settings, youtube_auth
 from backend.app.routers import videos, flashcards, export, settings, youtube_auth, auth
 from backend.app.config import settings as app_settings
 
@@ -21,6 +24,7 @@ app = FastAPI(
     version="1.0.0"
 )
 
+# CORS enabled for Chrome Extension (chrome-extension://*) and local dev
 # Parse CORS allowed origins from config
 raw_origins = getattr(app_settings, "ALLOWED_ORIGINS", "*")
 if raw_origins == "*":

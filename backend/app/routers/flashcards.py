@@ -138,4 +138,3 @@ def get_system_stats(
         cards_mastered=cards_mastered,
         total_reviews_completed=total_reviews
     )
-

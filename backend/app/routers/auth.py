@@ -108,3 +108,4 @@ def update_user_profile(
     db.commit()
     db.refresh(user)
     return user
+

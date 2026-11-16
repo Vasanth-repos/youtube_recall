@@ -26,6 +26,7 @@ function createMockElement(id, tag = 'div') {
     setAttribute(k, v) { this.attributes[k] = v; },
     getAttribute(k) { return this.attributes[k] || null; },
     addEventListener(evt, fn) {},
+    querySelectorAll(sel) { return []; }
     querySelectorAll(sel) { return []; },
     appendChild(c) {},
     removeChild(c) {},

@@ -891,6 +891,8 @@ async function loadStats() {
   if (hasServerBackend()) {
     try {
       const [vidRes, statRes] = await Promise.all([
+        fetch(apiUrl("/api/videos")),
+        fetch(apiUrl("/api/flashcards/stats"))
         authFetch(apiUrl("/api/videos")),
         authFetch(apiUrl("/api/flashcards/stats"))
       ]);
@@ -973,6 +975,7 @@ async function loadVideos() {
 
   if (hasServerBackend()) {
     try {
+      const res = await fetch(apiUrl(`/api/videos?sort_by=${encodeURIComponent(currentSort)}`));
       const res = await authFetch(apiUrl(`/api/videos?sort_by=${encodeURIComponent(currentSort)}`));
       if (res.ok) {
         serverVideos = await res.json();
@@ -1023,6 +1026,7 @@ async function autoIntakeSharedVideo(videoId) {
 
   if (hasServerBackend()) {
     try {
+      const res = await fetch(apiUrl("/api/videos/intake"), {
       const res = await authFetch(apiUrl("/api/videos/intake"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1726,6 +1730,7 @@ async function redistillCurrentVideo() {
         renderReaderView(updated);
       }
     } else {
+      const res = await fetch(apiUrl(`/api/videos/${currentViewingVideo.id}/redistill`), { method: "POST" });
       const res = await authFetch(apiUrl(`/api/videos/${currentViewingVideo.id}/redistill`), { method: "POST" });
       if (!res.ok) throw new Error("Failed to re-distill transcript");
       const data = await res.json();
@@ -1763,6 +1768,7 @@ async function deleteVideoById(videoId) {
   // Try server delete if backend available and not a purely local ID
   if (hasServerBackend() && !strId.startsWith("local_")) {
     try {
+      await fetch(apiUrl(`/api/videos/${videoId}`), { method: "DELETE" });
       await authFetch(apiUrl(`/api/videos/${videoId}`), { method: "DELETE" });
     } catch (e) {
       console.warn("Server delete warning:", e);
@@ -1825,6 +1831,7 @@ async function submitVideoIntake() {
   let succeeded = false;
   if (hasServerBackend()) {
     try {
+      const res = await fetch(apiUrl("/api/videos/intake"), {
       const res = await authFetch(apiUrl("/api/videos/intake"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1891,6 +1898,7 @@ async function loadSettings() {
 
   if (!storedKey && hasServerBackend()) {
     try {
+      const res = await fetch(apiUrl("/api/settings/gemini-key"));
       const res = await authFetch(apiUrl("/api/settings/gemini-key"));
       if (res.ok) {
         const data = await res.json();
@@ -1972,6 +1980,7 @@ async function saveAndTestGeminiKey() {
   // If server backend is connected, also save it to server
   if (hasServerBackend()) {
     try {
+      await fetch(apiUrl("/api/settings"), {
       await authFetch(apiUrl("/api/settings"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -2042,6 +2051,7 @@ async function saveSettings() {
 
   if (hasServerBackend()) {
     try {
+      const res = await fetch(apiUrl("/api/settings"), {
       const res = await authFetch(apiUrl("/api/settings"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -2081,6 +2091,7 @@ async function copyCurrentOrigin() {
 async function loadAccountStatus() {
   if (!hasServerBackend()) return;
   try {
+    const res = await fetch(apiUrl("/api/youtube/status"));
     const res = await authFetch(apiUrl("/api/youtube/status"));
     if (!res.ok) return;
     const data = await res.json();
@@ -2160,6 +2171,7 @@ async function startFlashcardSession(filterVideoId = null) {
   if (hasServerBackend()) {
     try {
       let url = filterVideoId ? `/api/flashcards/all?limit=100` : "/api/flashcards/due";
+      const res = await fetch(apiUrl(url));
       const res = await authFetch(apiUrl(url));
       if (res.ok) {
         cards = await res.json();
@@ -2215,6 +2227,7 @@ async function loadAllCardsSession() {
 
   if (hasServerBackend()) {
     try {
+      const res = await fetch(apiUrl("/api/flashcards/all?limit=100"));
       const res = await authFetch(apiUrl("/api/flashcards/all?limit=100"));
       if (res.ok) {
         cards = await res.json();
@@ -2323,6 +2336,7 @@ async function rateCurrentCard(rating) {
 
   if (hasServerBackend()) {
     try {
+      await fetch(apiUrl(`/api/flashcards/${card.id}/review`), {
       await authFetch(apiUrl(`/api/flashcards/${card.id}/review`), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -2395,6 +2409,7 @@ function downloadReaderAnki() {
   const vid = currentViewingVideo;
 
   if (hasServerBackend()) {
+    window.location.href = apiUrl(`/api/export/anki/${vid.id}/download`);
     authFetch(apiUrl(`/api/export/anki/${vid.id}/download`))
       .then(r => {
         if (!r.ok) throw new Error("Export download failed");
@@ -2424,6 +2439,7 @@ function downloadMarkdownById(videoId) {
   if (!vid) return;
 
   if (hasServerBackend()) {
+    window.location.href = apiUrl(`/api/export/obsidian/${vid.id}/download`);
     authFetch(apiUrl(`/api/export/obsidian/${vid.id}/download`))
       .then(r => {
         if (!r.ok) throw new Error("Obsidian download failed");

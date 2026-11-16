@@ -381,4 +381,3 @@ def delete_video(
     db.delete(vid)
     db.commit()
     return {"success": True, "message": f"Deleted video '{vid.title}'"}
-
