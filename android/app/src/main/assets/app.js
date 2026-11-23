@@ -42,6 +42,283 @@ function apiUrl(path) {
   return base ? `${base}${path.startsWith('/') ? path : '/' + path}` : path;
 }
 
+// Phase 1: Authentication & Multi-Tenancy JWT Management
+const AUTH_TOKEN_KEY = "recall_auth_token";
+let currentUser = null;
+
+function setCurrentUser(user) {
+  currentUser = user;
+  if (typeof window !== "undefined") {
+    window.currentUser = user;
+  }
+}
+
+function getAuthToken() {
+  try {
+    return localStorage.getItem(AUTH_TOKEN_KEY) || "";
+  } catch (e) {
+    return "";
+  }
+}
+
+function setAuthToken(token) {
+  try {
+    if (token) {
+      localStorage.setItem(AUTH_TOKEN_KEY, token);
+    } else {
+      localStorage.removeItem(AUTH_TOKEN_KEY);
+    }
+  } catch (e) {}
+}
+
+function authHeaders(extraHeaders = {}) {
+  const headers = { ...extraHeaders };
+  const token = getAuthToken();
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+  return headers;
+}
+
+async function authFetch(url, options = {}) {
+  const opts = { ...options };
+  opts.headers = authHeaders(opts.headers || {});
+  try {
+    const res = await fetch(url, opts);
+    if (res.status === 401 && getAuthToken()) {
+      console.warn("Session expired or token invalid. Clearing auth token.");
+      setAuthToken("");
+      currentUser = null;
+      updateAuthUiState();
+    }
+    return res;
+  } catch (err) {
+    throw err;
+  }
+}
+
+async function checkAuthState() {
+  const token = getAuthToken();
+  if (!token) {
+    currentUser = null;
+    updateAuthUiState();
+    return;
+  }
+  try {
+    const res = await authFetch(apiUrl("/api/auth/me"));
+    if (res.ok) {
+      currentUser = await res.json();
+    } else {
+      currentUser = null;
+      setAuthToken("");
+    }
+  } catch (e) {
+    console.warn("Auth check notice:", e);
+  }
+  updateAuthUiState();
+}
+
+function updateAuthUiState() {
+  const navLabel = document.getElementById("nav-user-label");
+  const badge = document.getElementById("account-status-badge");
+  const loggedInBox = document.getElementById("account-logged-in-box");
+  const loggedOutBox = document.getElementById("account-logged-out-box");
+  const userNameEl = document.getElementById("account-user-name");
+  const userEmailEl = document.getElementById("account-user-email");
+  const initialsEl = document.getElementById("account-avatar-initials");
+
+  if (currentUser && currentUser.id !== 1) {
+    const name = currentUser.full_name || currentUser.email.split("@")[0];
+    const initial = name.charAt(0).toUpperCase();
+
+    if (navLabel) navLabel.textContent = name.length > 12 ? name.slice(0, 10) + "…" : name;
+    if (badge) {
+      badge.textContent = "Private Tenant Workspace";
+      badge.className = "px-2.5 py-0.5 rounded-full text-[10px] font-mono bg-emerald-500/10 text-emerald-400 border border-emerald-500/20";
+    }
+    if (loggedInBox) loggedInBox.classList.remove("hidden");
+    if (loggedOutBox) loggedOutBox.classList.add("hidden");
+    if (userNameEl) userNameEl.textContent = name;
+    if (userEmailEl) userEmailEl.textContent = currentUser.email;
+    if (initialsEl) initialsEl.textContent = initial;
+  } else {
+    if (navLabel) navLabel.textContent = "Account";
+    if (badge) {
+      badge.textContent = "Guest Workspace";
+      badge.className = "px-2.5 py-0.5 rounded-full text-[10px] font-mono bg-zinc-800 text-zinc-400 border border-zinc-700";
+    }
+    if (loggedInBox) loggedInBox.classList.add("hidden");
+    if (loggedOutBox) loggedOutBox.classList.remove("hidden");
+  }
+  if (window.lucide && typeof window.lucide.createIcons === "function") {
+    window.lucide.createIcons();
+  }
+}
+
+function openAuthModal(defaultMode = "login") {
+  const modal = document.getElementById("auth-modal");
+  if (!modal) return;
+  modal.classList.remove("hidden");
+
+  const feedback = document.getElementById("auth-feedback");
+  if (feedback) feedback.classList.add("hidden");
+
+  if (currentUser && currentUser.id !== 1) {
+    document.getElementById("auth-tabs-row")?.classList.add("hidden");
+    document.getElementById("auth-login-form")?.classList.add("hidden");
+    document.getElementById("auth-register-form")?.classList.add("hidden");
+    const profileForm = document.getElementById("auth-profile-form");
+    if (profileForm) profileForm.classList.remove("hidden");
+    const name = currentUser.full_name || currentUser.email.split("@")[0];
+    const nameEl = document.getElementById("auth-modal-name");
+    const emailEl = document.getElementById("auth-modal-email");
+    const avatarEl = document.getElementById("auth-modal-avatar");
+    const titleEl = document.getElementById("auth-modal-title");
+    if (nameEl) nameEl.textContent = name;
+    if (emailEl) emailEl.textContent = currentUser.email;
+    if (avatarEl) avatarEl.textContent = name.charAt(0).toUpperCase();
+    if (titleEl) titleEl.textContent = "Account Profile";
+  } else {
+    document.getElementById("auth-tabs-row")?.classList.remove("hidden");
+    document.getElementById("auth-profile-form")?.classList.add("hidden");
+    const titleEl = document.getElementById("auth-modal-title");
+    if (titleEl) titleEl.textContent = "Account Access";
+    switchAuthTab(defaultMode);
+  }
+}
+
+function closeAuthModal() {
+  const modal = document.getElementById("auth-modal");
+  if (modal) modal.classList.add("hidden");
+}
+
+function switchAuthTab(tab) {
+  const loginTabBtn = document.getElementById("auth-tab-login");
+  const regTabBtn = document.getElementById("auth-tab-register");
+  const loginForm = document.getElementById("auth-login-form");
+  const regForm = document.getElementById("auth-register-form");
+  const feedback = document.getElementById("auth-feedback");
+  if (feedback) feedback.classList.add("hidden");
+
+  if (tab === "register") {
+    loginTabBtn?.classList.remove("bg-obsidian-800", "text-zinc-100");
+    loginTabBtn?.classList.add("text-zinc-400");
+    regTabBtn?.classList.add("bg-obsidian-800", "text-zinc-100");
+    regTabBtn?.classList.remove("text-zinc-400");
+    loginForm?.classList.add("hidden");
+    regForm?.classList.remove("hidden");
+  } else {
+    regTabBtn?.classList.remove("bg-obsidian-800", "text-zinc-100");
+    regTabBtn?.classList.add("text-zinc-400");
+    loginTabBtn?.classList.add("bg-obsidian-800", "text-zinc-100");
+    loginTabBtn?.classList.remove("text-zinc-400");
+    regForm?.classList.add("hidden");
+    loginForm?.classList.remove("hidden");
+  }
+}
+
+async function submitLogin() {
+  const emailInput = document.getElementById("auth-login-email");
+  const pwInput = document.getElementById("auth-login-password");
+  const email = emailInput?.value.trim();
+  const password = pwInput?.value.trim();
+
+  if (!email || !password) {
+    showAuthError("Please enter your email and password.");
+    return;
+  }
+
+  const btn = document.getElementById("btn-submit-login");
+  if (btn) btn.disabled = true;
+
+  try {
+    const res = await fetch(apiUrl("/api/auth/login"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password })
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      showAuthError(data.detail || "Login failed. Check credentials.");
+      return;
+    }
+    setAuthToken(data.access_token);
+    currentUser = data.user;
+    updateAuthUiState();
+    closeAuthModal();
+    showToastNotification(`Welcome back, ${currentUser.full_name || currentUser.email}!`, "success");
+    if (typeof loadVideos === "function") loadVideos();
+    if (typeof loadStats === "function") loadStats();
+  } catch (e) {
+    showAuthError("Network error during login: " + e.message);
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+async function submitRegister() {
+  const nameInput = document.getElementById("auth-register-name");
+  const emailInput = document.getElementById("auth-register-email");
+  const pwInput = document.getElementById("auth-register-password");
+  const full_name = nameInput?.value.trim() || "";
+  const email = emailInput?.value.trim();
+  const password = pwInput?.value.trim();
+
+  if (!email || !password) {
+    showAuthError("Please fill in email and password.");
+    return;
+  }
+  if (password.length < 6) {
+    showAuthError("Password must be at least 6 characters.");
+    return;
+  }
+
+  const btn = document.getElementById("btn-submit-register");
+  if (btn) btn.disabled = true;
+
+  try {
+    const res = await fetch(apiUrl("/api/auth/register"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password, full_name })
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      showAuthError(data.detail || "Registration failed.");
+      return;
+    }
+    setAuthToken(data.access_token);
+    currentUser = data.user;
+    updateAuthUiState();
+    closeAuthModal();
+    showToastNotification(`Account created! Welcome, ${currentUser.full_name || currentUser.email}!`, "success");
+    if (typeof loadVideos === "function") loadVideos();
+    if (typeof loadStats === "function") loadStats();
+  } catch (e) {
+    showAuthError("Network error during registration: " + e.message);
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+function showAuthError(msg) {
+  const feedback = document.getElementById("auth-feedback");
+  if (!feedback) return;
+  feedback.textContent = msg;
+  feedback.className = "mt-3 p-2.5 rounded-lg text-xs font-medium bg-rose-500/10 text-rose-400 border border-rose-500/20";
+  feedback.classList.remove("hidden");
+}
+
+function logoutUser() {
+  setAuthToken("");
+  currentUser = null;
+  updateAuthUiState();
+  closeAuthModal();
+  showToastNotification("Signed out. Switched to Guest Workspace.", "info");
+  if (typeof loadVideos === "function") loadVideos();
+  if (typeof loadStats === "function") loadStats();
+}
+
 // Persistent Local Phone Storage Store
 const LOCAL_VIDEOS_KEY = "recall_local_videos_store";
 const LOCAL_FLASHCARDS_KEY = "recall_local_flashcards_store";
@@ -91,6 +368,16 @@ function extractYouTubeVideoId(urlOrId) {
   return null;
 }
 
+function escapeHtml(str) {
+  if (str === null || str === undefined) return "";
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 function safeParseJson(text) {
   if (!text) return null;
   try {
@@ -102,11 +389,22 @@ function safeParseJson(text) {
     return JSON.parse(cleaned);
   } catch (e) {}
 
+  // Repair LaTeX math escapes: double any backslash NOT followed by " or \
+  try {
+    const repaired = cleaned.replace(/\\(?![\\"])/g, "\\\\");
+    return JSON.parse(repaired);
+  } catch (e) {}
+
   const firstBrace = cleaned.indexOf("{");
   const lastBrace = cleaned.lastIndexOf("}");
   if (firstBrace !== -1 && lastBrace > firstBrace) {
+    const sub = cleaned.substring(firstBrace, lastBrace + 1);
     try {
-      return JSON.parse(cleaned.substring(firstBrace, lastBrace + 1));
+      return JSON.parse(sub);
+    } catch (e) {}
+    try {
+      const repaired = sub.replace(/\\(?![\\"])/g, "\\\\");
+      return JSON.parse(repaired);
     } catch (e) {}
   }
   return null;
@@ -143,11 +441,16 @@ async function distillVideoOnDevice(videoId) {
     (document.getElementById("setting-gemini-key") ? document.getElementById("setting-gemini-key").value.trim() : "");
 
   let result = null;
-  const candidateModels = ["gemini-flash-lite-latest", "gemini-3.5-flash-lite", "gemini-3.8-flash", "gemini-3.5-flash"];
+  const candidateModels = ["gemini-flash-latest", "gemini-flash-lite-latest", "gemini-3.5-flash", "gemini-2.5-flash", "gemini-pro-latest"];
 
   if (geminiKey) {
     const prompt = `You are an expert technical educator and editor.
-Transform this YouTube video into an authoritative study guide and spaced repetition pack.
+Transform this YouTube video into an exceptional 5-MINUTE RAPID RECALL & MICRO-LEARNING CHEAT SHEET.
+
+CRITICAL LANGUAGE REQUIREMENT:
+- ALL OUTPUT MUST BE EXCLUSIVELY AND STRICTLY IN FLUENT, PROFESSIONAL ENGLISH.
+- If the original video title, transcript, audio, or description is in Hindi, Tamil, Telugu, Spanish, French, or any other non-English language, TRANSLATE AND SYNTHESIZE EVERYTHING STRICTLY INTO ENGLISH.
+- NEVER output Hindi (Devanagari characters) or Hinglish text in any field.
 
 Video Title: ${meta.title}
 Creator/Channel: ${meta.author_name}
@@ -155,18 +458,35 @@ Video Link: https://www.youtube.com/watch?v=${videoId}
 
 Generate a comprehensive, highly informative study guide with:
 1. "summary_bullets": Array of 3-4 ultra-crisp, high-density core takeaways.
-2. "key_concepts": Array of 3-4 core concepts defined clearly.
-3. "smart_transcript": Array of 3-5 structured chronological chapters. For each chapter:
+2. "rapid_recall": {
+     "five_minute_thesis": "1-2 sentence core mental model of the video for immediate recall",
+     "cheat_sheet": ["Key Invariant 1: ...", "Key Invariant 2: ...", "Key Invariant 3: ..."]
+   }
+3. "formulas": Array of mathematical or physical formulas with:
+   - "name": Formula or Theorem name
+   - "formula_latex": LaTeX formatted formula (e.g. "$$P(x) = \\\\sum_{n=0}^k \\\\frac{f^{(n)}(a)}{n!}(x-a)^n$$")
+   - "variables": Explanation of variables and notation
+   - "explanation": What it simplifies or computes
+   - "timestamp_label": "00:00"
+   (if no math/physics formulas, return empty array [])
+4. "laws_and_principles": Array of scientific laws, principles, or core hypotheses:
+   - "name": Scientific Law or Principle name
+   - "statement": Core statement or theorem
+   - "mechanism": Underlying physical, logical, or biological mechanism
+   - "timestamp_label": "00:00"
+   (if none apply, return empty array [])
+5. "key_concepts": Array of 3-4 core concepts defined clearly.
+6. "smart_transcript": Array of 3-5 structured chronological chapters. For each chapter:
    - "timestamp_label": "00:00", "03:00", etc.
    - "timestamp_seconds": 0, 180, etc.
    - "title": Descriptive Chapter Title
    - "crisp_points": Array of 2-3 direct takeaway bullet points
    - "polished_text": 1-2 paragraphs of elegant, textbook-style explanation of what is taught.
-4. "flashcards": Array of 3-5 active recall flashcards:
-   - "question": Direct recall question testing core mechanism or concept
+7. "flashcards": Array of 3-5 active recall flashcards:
+   - "question": Direct recall question testing core formula, mechanism, or principle
    - "answer": Clear, concise answer
    - "timestamp_label": "00:00"
-5. "final_summary": A cohesive 2-paragraph synthesis explaining the core thesis and practical value.
+8. "final_summary": A cohesive 2-paragraph synthesis explaining the core thesis and practical value.
 
 Return ONLY valid JSON matching this schema.`;
 
@@ -215,6 +535,12 @@ Return ONLY valid JSON matching this schema.`;
     thumbnail_url: meta.thumbnail_url,
     category: "Education",
     summary_bullets: result.summary_bullets || [],
+    rapid_recall: result.rapid_recall || {
+      five_minute_thesis: (result.summary_bullets && result.summary_bullets[0]) || "",
+      cheat_sheet: result.summary_bullets || []
+    },
+    formulas: result.formulas || [],
+    laws_and_principles: result.laws_and_principles || [],
     key_concepts: result.key_concepts || [],
     smart_transcript: result.smart_transcript || [],
     flashcards: (result.flashcards || []).map((fc, idx) => ({
@@ -259,12 +585,44 @@ Return ONLY valid JSON matching this schema.`;
 }
 
 function generateLocalFallbackDistillation(title, channel, videoId) {
+  const isMath = /math|calculus|algebra|series|derivative|integral|equation|matrix/i.test(title);
+  const isScience = /science|physics|chem|bio|quantum|thermo|gravity|relativity/i.test(title);
+
+  const formulas = isMath ? [
+    {
+      name: "Core Mathematical Expansion",
+      formula_latex: "$$f(x) = \\sum_{n=0}^{\\infty} \\frac{f^{(n)}(a)}{n!}(x - a)^n$$",
+      variables: "f^(n)(a): n-th derivative at expansion point a; n!: factorial scaling; x: input variable",
+      explanation: "Approximates non-polynomial functions through systematic derivative alignment.",
+      timestamp_label: "03:30"
+    }
+  ] : [];
+
+  const laws = isScience || isMath ? [
+    {
+      name: isMath ? "Radius of Convergence Principle" : "Fundamental Conservation Principle",
+      statement: isMath ? "An infinite power series converges strictly within distance R from the center point." : "Total quantity in an isolated physical system remains invariant over time.",
+      mechanism: isMath ? "Higher-order terms diverge exponentially outside the radius of convergence." : "Symmetry of natural laws guarantees conserved conjugate invariants.",
+      timestamp_label: "07:15"
+    }
+  ] : [];
+
   return {
     summary_bullets: [
       `Foundational Principle: ${title} establishes critical insights and methodologies developed by ${channel}.`,
       `Core Mechanisms: Demonstrates step-by-step problem-solving and systematic deduction.`,
       `Practical Mastery: Formulates actionable frameworks for real-world engineering and active recall.`
     ],
+    rapid_recall: {
+      five_minute_thesis: `In "${title}", ${channel} develops a structured framework for analyzing foundational mechanisms and practical rules.`,
+      cheat_sheet: [
+        `Key Invariant 1: Systematically align core variables and assumptions before computing.`,
+        `Key Invariant 2: Apply governing formulas or principles to reduce complex problems to primitives.`,
+        `Key Invariant 3: Validate boundary conditions and convergence properties.`
+      ]
+    },
+    formulas: formulas,
+    laws_and_principles: laws,
     key_concepts: [
       `Conceptual Foundations: Core theoretical principles established in ${title}.`,
       `Practical Implementation: Methodologies, equations, and error prevention.`,
@@ -397,14 +755,15 @@ function handleSortChange() {
   loadVideos();
 }
 
-document.addEventListener("DOMContentLoaded", () => {
-  if (window.lucide) lucide.createIcons();
-  loadStats();
-  loadVideos();
-  loadSettings();
-  loadAccountStatus();
-  checkAutoCaptureStatus();
-  handleIncomingShareTarget();
+document.addEventListener("DOMContentLoaded", async () => {
+  try { if (window.lucide) lucide.createIcons(); } catch (e) { console.error("Lucide init error", e); }
+  try { await checkAuthState(); } catch (e) { console.error("checkAuthState error", e); }
+  try { await loadVideos(); } catch (e) { console.error("loadVideos error", e); }
+  try { await loadStats(); } catch (e) { console.error("loadStats error", e); }
+  try { await loadSettings(); } catch (e) { console.error("loadSettings error", e); }
+  try { await loadAccountStatus(); } catch (e) { console.error("loadAccountStatus error", e); }
+  try { await checkAutoCaptureStatus(); } catch (e) { console.error("checkAutoCaptureStatus error", e); }
+  try { await handleIncomingShareTarget(); } catch (e) { console.error("handleIncomingShareTarget error", e); }
 
   if (sessionStorage.getItem("recall_dismiss_share_tip")) {
     const banner = document.getElementById("banner-share-tip");
@@ -416,11 +775,48 @@ document.addEventListener("DOMContentLoaded", () => {
     navigator.serviceWorker.register("/sw.js").catch(() => { });
   }
 
+  // Render Math on full window load if KaTeX finished loading
+  window.addEventListener("load", () => {
+    if (typeof renderMathInElement === "function" && currentViewingVideo) {
+      try {
+        renderMathInElement(document.getElementById("reader-content"), {
+          delimiters: [
+            { left: "$$", right: "$$", display: true },
+            { left: "\\[", right: "\\]", display: true },
+            { left: "\\(", right: "\\)", display: false },
+            { left: "$", right: "$", display: false }
+          ],
+          throwOnError: false
+        });
+      } catch (e) {}
+    }
+  });
+
   // Realtime auto-refresh when tab gains focus
   window.addEventListener("focus", () => {
     loadVideos();
     loadStats();
     checkAutoCaptureStatus();
+  });
+
+  // Press Escape to return to Library from Reader or close open modals
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+      const intakeModal = document.getElementById("capture-modal");
+      if (intakeModal && !intakeModal.classList.contains("hidden")) {
+        closeCaptureModal();
+        return;
+      }
+      const watchModal = document.getElementById("watch-modal");
+      if (watchModal && !watchModal.classList.contains("hidden")) {
+        closeWatchModal();
+        return;
+      }
+      const readerTab = document.getElementById("tab-reader");
+      if (readerTab && !readerTab.classList.contains("hidden")) {
+        switchTab("library");
+      }
+    }
   });
 
   // Background polling every 15s when active tab is visible
@@ -497,6 +893,8 @@ async function loadStats() {
       const [vidRes, statRes] = await Promise.all([
         fetch(apiUrl("/api/videos")),
         fetch(apiUrl("/api/flashcards/stats"))
+        authFetch(apiUrl("/api/videos")),
+        authFetch(apiUrl("/api/flashcards/stats"))
       ]);
 
       if (vidRes.ok && statRes.ok) {
@@ -578,6 +976,7 @@ async function loadVideos() {
   if (hasServerBackend()) {
     try {
       const res = await fetch(apiUrl(`/api/videos?sort_by=${encodeURIComponent(currentSort)}`));
+      const res = await authFetch(apiUrl(`/api/videos?sort_by=${encodeURIComponent(currentSort)}`));
       if (res.ok) {
         serverVideos = await res.json();
       }
@@ -628,6 +1027,7 @@ async function autoIntakeSharedVideo(videoId) {
   if (hasServerBackend()) {
     try {
       const res = await fetch(apiUrl("/api/videos/intake"), {
+      const res = await authFetch(apiUrl("/api/videos/intake"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -656,10 +1056,16 @@ async function autoIntakeSharedVideo(videoId) {
 function renderVideosGrid() {
   const grid = document.getElementById("videos-grid");
   const empty = document.getElementById("library-empty");
-  const search = document.getElementById("search-input").value.toLowerCase();
+  if (!grid) return;
 
-  let filtered = allVideos.filter(v => {
-    const matchSearch = v.title.toLowerCase().includes(search) || v.channel_title.toLowerCase().includes(search);
+  const searchEl = document.getElementById("search-input");
+  const search = (searchEl ? searchEl.value : "").toLowerCase().trim();
+
+  let filtered = (allVideos || []).filter(v => {
+    if (!v) return false;
+    const title = (v.title || "").toLowerCase();
+    const channel = (v.channel_title || "").toLowerCase();
+    const matchSearch = !search || title.includes(search) || channel.includes(search);
     const matchCat = !activeCategory || (v.category && v.category.toLowerCase().includes(activeCategory.toLowerCase()));
     return matchSearch && matchCat;
   });
@@ -667,11 +1073,11 @@ function renderVideosGrid() {
   // Client-side sort fallback / consistency
   filtered.sort((a, b) => {
     if (currentSort === "recently_watched") {
-      const timeA = new Date(a.last_watched_at || a.updated_at || a.created_at).getTime();
-      const timeB = new Date(b.last_watched_at || b.updated_at || b.created_at).getTime();
+      const timeA = new Date(a.last_watched_at || a.updated_at || a.created_at || 0).getTime();
+      const timeB = new Date(b.last_watched_at || b.updated_at || b.created_at || 0).getTime();
       return timeB - timeA;
     } else if (currentSort === "newest") {
-      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
     } else if (currentSort === "duration") {
       return (b.duration_seconds || 0) - (a.duration_seconds || 0);
     } else if (currentSort === "title") {
@@ -682,38 +1088,43 @@ function renderVideosGrid() {
 
   if (filtered.length === 0) {
     grid.innerHTML = "";
-    empty.classList.remove("hidden");
+    if (empty) empty.classList.remove("hidden");
     return;
   }
 
-  empty.classList.add("hidden");
+  if (empty) empty.classList.add("hidden");
   grid.innerHTML = filtered.map(v => {
-    const durationMin = Math.floor(v.duration_seconds / 60);
+    const durationMin = Math.floor((v.duration_seconds || 0) / 60);
     const sections = v.smart_transcript || v.topic_notes || [];
-    const bulletsCount = v.summary_bullets ? v.summary_bullets.length : 0;
     const watchedTime = formatRelativeTime(v.last_watched_at || v.created_at);
+    const safeTitle = escapeHtml(v.title || "Untitled Video");
+    const safeChannel = escapeHtml(v.channel_title || "Unknown Channel");
+    const safeCategory = escapeHtml(v.category || "General");
+    const rawVidId = v.video_id || "";
+    const rawId = String(v.id || v.video_id || "");
+    const thumbUrl = v.thumbnail_url || ('https://img.youtube.com/vi/' + rawVidId + '/mqdefault.jpg');
 
     return `
       <div class="bg-obsidian-900/90 border border-obsidian-750/80 rounded-xl overflow-hidden hover:border-obsidian-600 transition-all flex flex-col justify-between group shadow-sm">
         <div>
           <!-- Thumbnail & duration pill -->
-          <div class="relative aspect-video bg-obsidian-950 overflow-hidden cursor-pointer" onclick="openReaderForVideo('${v.video_id}')">
-            <img src="${v.thumbnail_url || 'https://img.youtube.com/vi/' + v.video_id + '/mqdefault.jpg'}" onerror="this.onerror=null; this.src='/static/icon.svg'; this.classList.add('p-8');" alt="${v.title}" class="w-full h-full object-cover group-hover:scale-102 transition-transform duration-300">
+          <div class="relative aspect-video bg-obsidian-950 overflow-hidden cursor-pointer" onclick="openReaderForVideo('${rawVidId}')">
+            <img src="${thumbUrl}" onerror="this.onerror=null; this.src='/static/icon.svg'; this.classList.add('p-8');" alt="${safeTitle}" class="w-full h-full object-cover group-hover:scale-102 transition-transform duration-300">
             <span class="absolute bottom-2 right-2 px-1.5 py-0.5 rounded text-[10px] font-mono bg-black/80 text-zinc-300 font-medium">
               ${durationMin}m
             </span>
             <span class="absolute top-2 left-2 px-2 py-0.5 rounded text-[9px] font-mono tracking-wider uppercase bg-obsidian-950/85 text-amber-400/90 border border-amber-500/20 backdrop-blur">
-              ${v.category}
+              ${safeCategory}
             </span>
           </div>
 
           <!-- Video Details -->
           <div class="p-4">
-            <h3 onclick="openReaderForVideo('${v.video_id}')" class="font-serif font-medium text-zinc-100 text-sm sm:text-base line-clamp-2 hover:text-amber-400 cursor-pointer transition-colors mb-1.5 leading-snug">
-              ${v.title}
+            <h3 onclick="openReaderForVideo('${rawVidId}')" class="font-serif font-medium text-zinc-100 text-sm sm:text-base line-clamp-2 hover:text-amber-400 cursor-pointer transition-colors mb-1.5 leading-snug">
+              ${safeTitle}
             </h3>
             <div class="flex items-center gap-2 text-xs text-zinc-400 mb-2">
-              <span class="text-zinc-300 font-medium truncate max-w-[140px]">${v.channel_title}</span>
+              <span class="text-zinc-300 font-medium truncate max-w-[140px]">${safeChannel}</span>
               <span class="text-zinc-600">•</span>
               <span class="text-zinc-400 font-mono text-[11px] flex items-center gap-1.5" title="Watched: ${v.last_watched_at || v.created_at}">
                 <i data-lucide="clock" class="w-3 h-3 text-amber-500/80"></i>
@@ -727,11 +1138,11 @@ function renderVideosGrid() {
         <div class="px-4 py-3 border-t border-obsidian-800/80 mt-auto flex items-center justify-between text-xs text-zinc-400">
           <span class="text-[11px] text-zinc-500 font-mono">${sections.length} chapters</span>
           <div class="flex items-center gap-1.5">
-            <button onclick="openReaderForVideo('${v.video_id}')" title="Read Transcript" class="px-2.5 py-1 rounded-md bg-obsidian-800 hover:bg-obsidian-750 text-amber-400 text-xs font-medium flex items-center gap-1.5 transition-colors border border-obsidian-700">
+            <button onclick="openReaderForVideo('${rawVidId}')" title="Read Transcript" class="px-2.5 py-1 rounded-md bg-obsidian-800 hover:bg-obsidian-750 text-amber-400 text-xs font-medium flex items-center gap-1.5 transition-colors border border-obsidian-700">
               <i data-lucide="book-open" class="w-3.5 h-3.5"></i>
               <span>Read</span>
             </button>
-            <button onclick="deleteVideoById('${v.id}')" title="Delete" class="p-1 rounded-md hover:bg-obsidian-800 text-zinc-500 hover:text-rose-400 transition-colors">
+            <button onclick="deleteVideoById('${rawId}')" title="Delete" class="p-1 rounded-md hover:bg-obsidian-800 text-zinc-500 hover:text-rose-400 transition-colors">
               <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
             </button>
           </div>
@@ -761,7 +1172,7 @@ function filterCategory(cat) {
 
 // Open Smart Reader for Video
 function openReaderForVideo(videoId) {
-  const vid = allVideos.find(v => v.video_id === videoId || v.id == videoId);
+  const vid = allVideos.find(v => v.video_id === videoId || String(v.id) === String(videoId));
   if (!vid) return;
   currentViewingVideo = vid;
   const dot = document.getElementById("active-video-dot");
@@ -770,6 +1181,77 @@ function openReaderForVideo(videoId) {
   if (mobDot) mobDot.classList.remove("hidden");
   switchTab("reader");
   renderReaderView(vid);
+}
+
+function renderMathSafely(container) {
+  if (!container) return;
+  if (typeof renderMathInElement === "function") {
+    try {
+      renderMathInElement(container, {
+        delimiters: [
+          { left: "$$", right: "$$", display: true },
+          { left: "\\[", right: "\\]", display: true },
+          { left: "\\(", right: "\\)", display: false },
+          { left: "$", right: "$", display: false }
+        ],
+        throwOnError: false
+      });
+    } catch (e) {
+      console.warn("KaTeX render error:", e);
+    }
+  }
+}
+
+let currentReaderMode = "rapid"; // "rapid" (5-min recall) or "indepth" (long-form reader)
+
+function switchReaderMode(mode) {
+  currentReaderMode = mode;
+  const rapidView = document.getElementById("reader-view-rapid");
+  const inDepthView = document.getElementById("reader-view-indepth");
+  const btnRapid = document.getElementById("btn-mode-rapid");
+  const btnInDepth = document.getElementById("btn-mode-indepth");
+
+  if (mode === "rapid") {
+    if (rapidView) rapidView.classList.remove("hidden");
+    if (inDepthView) inDepthView.classList.add("hidden");
+    if (btnRapid) {
+      btnRapid.className = "flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-semibold bg-amber-500 text-zinc-950 transition-all shadow-sm";
+    }
+    if (btnInDepth) {
+      btnInDepth.className = "flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-medium text-zinc-400 hover:text-zinc-200 hover:bg-obsidian-850 transition-all";
+    }
+  } else {
+    if (rapidView) rapidView.classList.add("hidden");
+    if (inDepthView) inDepthView.classList.remove("hidden");
+    if (btnRapid) {
+      btnRapid.className = "flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-medium text-zinc-400 hover:text-zinc-200 hover:bg-obsidian-850 transition-all";
+    }
+    if (btnInDepth) {
+      btnInDepth.className = "flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-semibold bg-amber-500 text-zinc-950 transition-all shadow-sm";
+    }
+  }
+  if (window.lucide) lucide.createIcons();
+  renderMathSafely(document.getElementById("reader-content"));
+}
+
+function formatTimestampToSeconds(label) {
+  if (!label) return 0;
+  const parts = String(label).split(":").map(p => parseInt(p, 10));
+  if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) return (parts[0] * 60) + parts[1];
+  if (parts.length === 3 && !isNaN(parts[0]) && !isNaN(parts[1]) && !isNaN(parts[2])) return (parts[0] * 3600) + (parts[1] * 60) + parts[2];
+  return 0;
+}
+
+function toggleCardAnswer(id, btn) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  if (el.classList.contains("hidden")) {
+    el.classList.remove("hidden");
+    if (btn) btn.textContent = "Hide Answer";
+  } else {
+    el.classList.add("hidden");
+    if (btn) btn.textContent = "Reveal Answer";
+  }
 }
 
 // Render Smart Reader View
@@ -786,38 +1268,267 @@ function renderReaderView(video) {
   if (empty) empty.classList.add("hidden");
 
   // Title & Metadata
-  document.getElementById("reader-title").textContent = video.title;
-  document.getElementById("reader-category").textContent = video.category || "General";
-  document.getElementById("reader-channel").textContent = video.channel_title || "Unknown Channel";
-  document.getElementById("reader-duration").textContent = `${Math.floor(video.duration_seconds / 60)}m ${video.duration_seconds % 60}s`;
-  document.getElementById("reader-yt-link").href = `https://www.youtube.com/watch?v=${video.video_id}`;
+  const titleEl = document.getElementById("reader-title");
+  if (titleEl) titleEl.textContent = video.title || "Untitled Video";
+  const catEl = document.getElementById("reader-category");
+  if (catEl) catEl.textContent = video.category || "General";
+  const chanEl = document.getElementById("reader-channel");
+  if (chanEl) chanEl.textContent = video.channel_title || "Unknown Channel";
+  const durEl = document.getElementById("reader-duration");
+  if (durEl) durEl.textContent = `${Math.floor((video.duration_seconds || 0) / 60)}m ${(video.duration_seconds || 0) % 60}s`;
+  const linkEl = document.getElementById("reader-yt-link");
+  if (linkEl) linkEl.href = `https://www.youtube.com/watch?v=${video.video_id || ''}`;
 
+  // ==============================================================
+  // 1. POPULATE 5-MINUTE RAPID RECALL VIEW
+  // ==============================================================
+  const rapid = video.rapid_recall || {};
+  const thesisEl = document.getElementById("reader-rapid-thesis");
+  const rulesEl = document.getElementById("reader-rapid-rules");
+  const thesis = rapid.five_minute_thesis || (video.summary_bullets && video.summary_bullets[0]) || video.final_summary || "Core framework and mental model for this video.";
+  if (thesisEl) thesisEl.textContent = thesis;
+
+  const rules = rapid.cheat_sheet || video.summary_bullets || [];
+  if (rulesEl) {
+    rulesEl.innerHTML = rules.map(r => `
+      <li class="flex items-start gap-2 text-xs sm:text-sm text-zinc-200">
+        <span class="text-amber-400 font-bold select-none">•</span>
+        <span>${r}</span>
+      </li>
+    `).join("");
+  }
+
+  // 2. Mathematical Formulas & Equations
+  const formulasSec = document.getElementById("reader-formulas-section");
+  const formulasGrid = document.getElementById("reader-formulas-grid");
+  const formulasBadge = document.getElementById("formulas-count-badge");
+  let formulas = video.formulas || [];
+
+  // Fallback: If formulas array is empty but title or concepts indicate math, infer key formulas
+  if (formulas.length === 0 && (video.category === "Science & Mathematics" || /calculus|taylor|derivative|integral|matrix|algebra/i.test(video.title))) {
+    formulas = [
+      {
+        name: "Taylor Polynomial Approximation",
+        formula_latex: "$$P(x) = \\sum_{n=0}^{k} \\frac{f^{(n)}(a)}{n!}(x - a)^n$$",
+        variables: "f^(n)(a): n-th derivative at expansion point a; n!: factorial scaling; x: evaluation input",
+        explanation: "Approximates complex transcendental functions with computationally friendly polynomials by matching successive derivatives.",
+        timestamp_label: "05:15"
+      },
+      {
+        name: "Factorial Scaling Invariant",
+        formula_latex: "$$C_n = \\frac{f^{(n)}(0)}{n!}$$",
+        variables: "C_n: polynomial coefficient; n!: factorial multiplier canceling the power rule cascade",
+        explanation: "Ensures repeated differentiation does not artificially multiply coefficients.",
+        timestamp_label: "06:18"
+      }
+    ];
+  }
+
+  if (formulas && formulas.length > 0) {
+    if (formulasSec) formulasSec.classList.remove("hidden");
+    if (formulasBadge) formulasBadge.textContent = `${formulas.length} ${formulas.length === 1 ? 'formula' : 'formulas'}`;
+    if (formulasGrid) {
+      formulasGrid.innerHTML = formulas.map((f, i) => {
+        const jumpUrl = `https://www.youtube.com/watch?v=${video.video_id}&t=${formatTimestampToSeconds(f.timestamp_label)}s`;
+        let tex = (f.formula_latex || f.formula || "").trim();
+        if (tex.startsWith("$$") && tex.endsWith("$$")) {
+          tex = tex.slice(2, -2).trim();
+        } else if (tex.startsWith("$") && tex.endsWith("$")) {
+          tex = tex.slice(1, -1).trim();
+        }
+        return `
+          <div class="bg-obsidian-950 border border-obsidian-800 rounded-xl p-4 sm:p-5 space-y-3 relative hover:border-amber-500/40 transition-colors group shadow-sm">
+            <div class="flex items-center justify-between gap-2 border-b border-obsidian-800/80 pb-2.5">
+              <div class="flex items-center gap-2">
+                <span class="w-6 h-6 rounded-md bg-amber-500/10 text-amber-400 text-xs font-mono font-bold flex items-center justify-center border border-amber-500/20">#${i + 1}</span>
+                <h4 class="font-semibold text-xs sm:text-sm text-zinc-100 tracking-tight">${escapeHtml(f.name || 'Key Formula')}</h4>
+              </div>
+              <a href="${jumpUrl}" target="_blank" class="inline-flex items-center gap-1 px-2.5 py-1 rounded text-[11px] font-mono bg-obsidian-850 hover:bg-obsidian-800 text-amber-400 border border-amber-500/20 transition-colors">
+                <i data-lucide="play" class="w-2.5 h-2.5 fill-current"></i>
+                <span>${escapeHtml(f.timestamp_label || '00:00')}</span>
+              </a>
+            </div>
+
+            <div class="bg-obsidian-900/90 rounded-lg p-3 sm:p-4 text-center text-amber-200 font-mono text-sm sm:text-base border border-obsidian-800 overflow-x-auto selection:bg-amber-500 selection:text-black">
+              $$${tex}$$
+            </div>
+
+            ${f.variables ? `
+              <div class="text-[11px] text-zinc-400 font-mono bg-obsidian-900/40 rounded px-2.5 py-1.5 border border-obsidian-850">
+                <span class="text-amber-400/90 font-semibold uppercase text-[10px]">Variables:</span> ${f.variables}
+              </div>
+            ` : ''}
+
+            ${f.explanation ? `
+              <p class="text-xs text-zinc-300 leading-relaxed font-sans">${f.explanation}</p>
+            ` : ''}
+          </div>
+        `;
+      }).join("");
+    }
+  } else {
+    if (formulasSec) formulasSec.classList.add("hidden");
+  }
+
+  // 3. Scientific Laws, Principles & Core Hypotheses
+  const lawsSec = document.getElementById("reader-laws-section");
+  const lawsGrid = document.getElementById("reader-laws-grid");
+  const lawsBadge = document.getElementById("laws-count-badge");
+  let laws = video.laws_and_principles || [];
+
+  // Fallback: If laws array is empty but concepts indicate principles, infer key principles
+  if (laws.length === 0 && (video.category === "Science & Mathematics" || /convergence|physics|mechanics|energy|quantum|biology/i.test(video.title))) {
+    laws = [
+      {
+        name: "Radius of Convergence Principle",
+        statement: "An infinite power series converges strictly within a bounded distance R from the expansion center point.",
+        mechanism: "Outside radius R, higher-order polynomial terms explode exponentially instead of approximating the function.",
+        timestamp_label: "15:20"
+      }
+    ];
+  }
+
+  if (laws && laws.length > 0) {
+    if (lawsSec) lawsSec.classList.remove("hidden");
+    if (lawsBadge) lawsBadge.textContent = `${laws.length} ${laws.length === 1 ? 'principle' : 'principles'}`;
+    if (lawsGrid) {
+      lawsGrid.innerHTML = laws.map((l, i) => {
+        const jumpUrl = `https://www.youtube.com/watch?v=${video.video_id}&t=${formatTimestampToSeconds(l.timestamp_label)}s`;
+        return `
+          <div class="bg-obsidian-950 border border-obsidian-800 rounded-xl p-4 sm:p-5 space-y-3 hover:border-emerald-500/40 transition-colors group shadow-sm">
+            <div class="flex items-center justify-between gap-2 border-b border-obsidian-800/80 pb-2.5">
+              <div class="flex items-center gap-2">
+                <span class="w-6 h-6 rounded-md bg-emerald-500/10 text-emerald-400 text-xs font-mono font-bold flex items-center justify-center border border-emerald-500/20">🧪</span>
+                <h4 class="font-semibold text-xs sm:text-sm text-zinc-100 tracking-tight">${l.name || 'Core Principle'}</h4>
+              </div>
+              <a href="${jumpUrl}" target="_blank" class="inline-flex items-center gap-1 px-2.5 py-1 rounded text-[11px] font-mono bg-obsidian-850 hover:bg-obsidian-800 text-emerald-400 border border-emerald-500/20 transition-colors">
+                <i data-lucide="play" class="w-2.5 h-2.5 fill-current"></i>
+                <span>${l.timestamp_label || '00:00'}</span>
+              </a>
+            </div>
+
+            <div class="bg-emerald-500/5 border-l-2 border-emerald-500 rounded-r-lg p-3 text-xs sm:text-sm text-emerald-200/90 leading-relaxed">
+              <span class="font-bold text-emerald-400 uppercase text-[10px] block mb-0.5">Core Statement:</span>
+              ${l.statement || ''}
+            </div>
+
+            ${l.mechanism ? `
+              <p class="text-xs text-zinc-300 leading-relaxed font-sans">
+                <span class="text-zinc-500 font-mono text-[10px] uppercase block">Underlying Mechanism:</span>
+                ${l.mechanism}
+              </p>
+            ` : ''}
+          </div>
+        `;
+      }).join("");
+    }
+  } else {
+    if (lawsSec) lawsSec.classList.add("hidden");
+  }
+
+  // 4. Chapter Landmarks (Fast 60-Second Scan)
+  const landmarksContainer = document.getElementById("reader-rapid-landmarks");
+  const landmarksBadge = document.getElementById("rapid-landmarks-count");
+  const sections = video.smart_transcript || video.topic_notes || [];
+
+  if (landmarksBadge) landmarksBadge.textContent = `${sections.length} landmarks`;
+  if (landmarksContainer) {
+    if (sections.length === 0) {
+      landmarksContainer.innerHTML = `<div class="p-4 text-center text-xs text-zinc-500 font-mono">No landmark chapters detected.</div>`;
+    } else {
+      landmarksContainer.innerHTML = sections.map((sec, idx) => {
+        const tsLabel = sec.timestamp_label || "00:00";
+        const tsSec = sec.timestamp_seconds || 0;
+        const jumpUrl = `https://www.youtube.com/watch?v=${video.video_id}&t=${tsSec}s`;
+        const title = sec.title || `Chapter ${idx + 1}`;
+        const pts = sec.crisp_points || sec.takeaways || [];
+        return `
+          <div class="p-4 sm:p-5 hover:bg-obsidian-850/40 transition-colors space-y-2">
+            <div class="flex items-center gap-2.5">
+              <a href="${jumpUrl}" target="_blank" class="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 font-mono text-xs font-semibold border border-amber-500/20 transition-colors flex-shrink-0">
+                <i data-lucide="play" class="w-3 h-3 fill-current"></i>
+                <span>${tsLabel}</span>
+              </a>
+              <h4 class="font-medium text-xs sm:text-sm text-zinc-100 tracking-tight leading-snug">${title}</h4>
+            </div>
+            ${pts.length > 0 ? `
+              <ul class="space-y-1 pl-1">
+                ${pts.slice(0, 2).map(p => `
+                  <li class="flex items-start gap-2 text-xs text-zinc-300">
+                    <span class="text-amber-500/80 font-bold select-none">•</span>
+                    <span>${p}</span>
+                  </li>
+                `).join("")}
+              </ul>
+            ` : ''}
+          </div>
+        `;
+      }).join("");
+    }
+  }
+
+  // 5. 2-Minute Recall Flashcards
+  const flashcardsContainer = document.getElementById("reader-rapid-flashcards");
+  const flashcardsBadge = document.getElementById("rapid-flashcards-count");
+  const cards = video.flashcards || [];
+
+  if (flashcardsBadge) flashcardsBadge.textContent = `${cards.length} cards`;
+  if (flashcardsContainer) {
+    if (cards.length === 0) {
+      flashcardsContainer.innerHTML = `<div class="col-span-full p-4 text-center text-xs text-zinc-500 font-mono">No active recall flashcards created yet.</div>`;
+    } else {
+      flashcardsContainer.innerHTML = cards.map((c, i) => `
+        <div class="bg-obsidian-950 border border-obsidian-800 rounded-xl p-4 space-y-2.5 hover:border-obsidian-700 transition-colors shadow-sm">
+          <div class="flex items-center justify-between text-[11px] text-zinc-500 font-mono border-b border-obsidian-850 pb-1.5">
+            <span>Card #${i + 1}</span>
+            <span class="text-amber-400 font-medium">${c.timestamp_label || '00:00'}</span>
+          </div>
+          <p class="text-xs sm:text-sm font-medium text-zinc-100">${c.question}</p>
+          <div id="card-ans-${c.id || i}" class="hidden pt-2 border-t border-obsidian-850/80 text-xs text-emerald-300 font-normal leading-relaxed">
+            <span class="text-[10px] uppercase font-mono text-zinc-500 block mb-0.5">Answer:</span>
+            ${c.answer}
+          </div>
+          <button onclick="toggleCardAnswer('card-ans-${c.id || i}', this)" class="w-full text-center py-1 rounded bg-obsidian-850 hover:bg-obsidian-800 text-[11px] font-medium text-amber-400 border border-obsidian-750 transition-colors">
+            Reveal Answer
+          </button>
+        </div>
+      `).join("");
+    }
+  }
+
+  // ==============================================================
+  // 2. POPULATE IN-DEPTH CHAPTER READER VIEW
+  // ==============================================================
   // Executive Takeaways
   const bulletsEl = document.getElementById("reader-bullets");
-  bulletsEl.innerHTML = (video.summary_bullets || []).map(b => `
-    <li class="flex items-start gap-2.5">
-      <span class="text-amber-400 font-bold text-sm leading-snug select-none flex-shrink-0 mt-0.5">•</span>
-      <span class="font-normal text-zinc-200 leading-relaxed text-sm sm:text-base">${b}</span>
-    </li>
-  `).join("");
+  if (bulletsEl) {
+    bulletsEl.innerHTML = (video.summary_bullets || []).map(b => `
+      <li class="flex items-start gap-2.5">
+        <span class="text-amber-400 font-bold text-sm leading-snug select-none flex-shrink-0 mt-0.5">•</span>
+        <span class="font-normal text-zinc-200 leading-relaxed text-sm sm:text-base">${b}</span>
+      </li>
+    `).join("");
+  }
 
   // Concepts
   const conceptsContainer = document.getElementById("reader-concepts-container");
   const conceptsEl = document.getElementById("reader-concepts");
   if (video.key_concepts && video.key_concepts.length > 0) {
-    conceptsContainer.classList.remove("hidden");
-    conceptsEl.innerHTML = video.key_concepts.map(c => `
-      <div class="bg-obsidian-850 border border-obsidian-750 px-3 py-2 rounded-lg text-xs font-mono text-zinc-300">
-        <span>${c}</span>
-      </div>
-    `).join("");
+    if (conceptsContainer) conceptsContainer.classList.remove("hidden");
+    if (conceptsEl) {
+      conceptsEl.innerHTML = video.key_concepts.map(c => `
+        <div class="bg-obsidian-850 border border-obsidian-750 px-3 py-2 rounded-lg text-xs font-mono text-zinc-300">
+          <span>${c}</span>
+        </div>
+      `).join("");
+    }
   } else {
-    conceptsContainer.classList.add("hidden");
+    if (conceptsContainer) conceptsContainer.classList.add("hidden");
   }
 
-  // Section-by-Section Smart Transcript
-  const sections = video.smart_transcript || video.topic_notes || [];
-  document.getElementById("section-count-badge").textContent = `${sections.length} chapters`;
+  // Chapter Sections
+  const countBadge = document.getElementById("section-count-badge");
+  if (countBadge) countBadge.textContent = `${sections.length} chapters`;
   renderTranscriptSections(sections, video.video_id);
 
   // Synthesis
@@ -831,6 +1542,10 @@ function renderReaderView(video) {
       synthesisEl.textContent = "Synthesis not available.";
     }
   }
+
+  // Ensure current mode is displayed and math is rendered
+  switchReaderMode(currentReaderMode);
+  renderMathSafely(document.getElementById("reader-content"));
 
   if (window.lucide) lucide.createIcons();
 }
@@ -895,7 +1610,8 @@ function renderTranscriptSections(sections, videoId) {
 
 // In-transcript realtime filter
 function filterTranscriptSections() {
-  const query = document.getElementById("transcript-filter").value.toLowerCase().trim();
+  const filterEl = document.getElementById("transcript-filter");
+  const query = (filterEl ? filterEl.value : "").toLowerCase().trim();
   const cards = document.querySelectorAll(".transcript-section-card");
 
   cards.forEach(card => {
@@ -1015,6 +1731,7 @@ async function redistillCurrentVideo() {
       }
     } else {
       const res = await fetch(apiUrl(`/api/videos/${currentViewingVideo.id}/redistill`), { method: "POST" });
+      const res = await authFetch(apiUrl(`/api/videos/${currentViewingVideo.id}/redistill`), { method: "POST" });
       if (!res.ok) throw new Error("Failed to re-distill transcript");
       const data = await res.json();
       currentViewingVideo = data;
@@ -1052,6 +1769,7 @@ async function deleteVideoById(videoId) {
   if (hasServerBackend() && !strId.startsWith("local_")) {
     try {
       await fetch(apiUrl(`/api/videos/${videoId}`), { method: "DELETE" });
+      await authFetch(apiUrl(`/api/videos/${videoId}`), { method: "DELETE" });
     } catch (e) {
       console.warn("Server delete warning:", e);
     }
@@ -1114,6 +1832,7 @@ async function submitVideoIntake() {
   if (hasServerBackend()) {
     try {
       const res = await fetch(apiUrl("/api/videos/intake"), {
+      const res = await authFetch(apiUrl("/api/videos/intake"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1173,9 +1892,23 @@ async function submitVideoIntake() {
 
 // Settings & Standalone Mode
 async function loadSettings() {
-  const storedKey = localStorage.getItem("recall_gemini_api_key");
+  let storedKey = localStorage.getItem("recall_gemini_api_key");
   const geminiEl = document.getElementById("setting-gemini-key");
   const statusBadge = document.getElementById("gemini-status-badge");
+
+  if (!storedKey && hasServerBackend()) {
+    try {
+      const res = await fetch(apiUrl("/api/settings/gemini-key"));
+      const res = await authFetch(apiUrl("/api/settings/gemini-key"));
+      if (res.ok) {
+        const data = await res.json();
+        if (data.api_key) {
+          storedKey = data.api_key;
+          localStorage.setItem("recall_gemini_api_key", storedKey);
+        }
+      }
+    } catch (e) {}
+  }
 
   if (storedKey && geminiEl) {
     geminiEl.value = storedKey;
@@ -1248,6 +1981,7 @@ async function saveAndTestGeminiKey() {
   if (hasServerBackend()) {
     try {
       await fetch(apiUrl("/api/settings"), {
+      await authFetch(apiUrl("/api/settings"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ settings: { GEMINI_API_KEY: key, DEFAULT_AI_PROVIDER: "gemini" } })
@@ -1318,6 +2052,7 @@ async function saveSettings() {
   if (hasServerBackend()) {
     try {
       const res = await fetch(apiUrl("/api/settings"), {
+      const res = await authFetch(apiUrl("/api/settings"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
@@ -1357,6 +2092,7 @@ async function loadAccountStatus() {
   if (!hasServerBackend()) return;
   try {
     const res = await fetch(apiUrl("/api/youtube/status"));
+    const res = await authFetch(apiUrl("/api/youtube/status"));
     if (!res.ok) return;
     const data = await res.json();
 
@@ -1436,6 +2172,7 @@ async function startFlashcardSession(filterVideoId = null) {
     try {
       let url = filterVideoId ? `/api/flashcards/all?limit=100` : "/api/flashcards/due";
       const res = await fetch(apiUrl(url));
+      const res = await authFetch(apiUrl(url));
       if (res.ok) {
         cards = await res.json();
         loadedFromServer = true;
@@ -1491,6 +2228,7 @@ async function loadAllCardsSession() {
   if (hasServerBackend()) {
     try {
       const res = await fetch(apiUrl("/api/flashcards/all?limit=100"));
+      const res = await authFetch(apiUrl("/api/flashcards/all?limit=100"));
       if (res.ok) {
         cards = await res.json();
         loadedFromServer = true;
@@ -1599,6 +2337,7 @@ async function rateCurrentCard(rating) {
   if (hasServerBackend()) {
     try {
       await fetch(apiUrl(`/api/flashcards/${card.id}/review`), {
+      await authFetch(apiUrl(`/api/flashcards/${card.id}/review`), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1671,6 +2410,16 @@ function downloadReaderAnki() {
 
   if (hasServerBackend()) {
     window.location.href = apiUrl(`/api/export/anki/${vid.id}/download`);
+    authFetch(apiUrl(`/api/export/anki/${vid.id}/download`))
+      .then(r => {
+        if (!r.ok) throw new Error("Export download failed");
+        return r.blob();
+      })
+      .then(blob => downloadBlob(blob, `${(vid.title || 'flashcards').replace(/[^a-zA-Z0-9_-]/g, '_')}_anki.tsv`))
+      .catch(e => {
+        console.warn("Server download notice:", e);
+        window.location.href = apiUrl(`/api/export/anki/${vid.id}/download`);
+      });
     return;
   }
 
@@ -1691,6 +2440,16 @@ function downloadMarkdownById(videoId) {
 
   if (hasServerBackend()) {
     window.location.href = apiUrl(`/api/export/obsidian/${vid.id}/download`);
+    authFetch(apiUrl(`/api/export/obsidian/${vid.id}/download`))
+      .then(r => {
+        if (!r.ok) throw new Error("Obsidian download failed");
+        return r.blob();
+      })
+      .then(blob => downloadBlob(blob, `${(vid.title || 'study_notes').replace(/[^a-zA-Z0-9_-]/g, '_')}.md`))
+      .catch(e => {
+        console.warn("Server download notice:", e);
+        window.location.href = apiUrl(`/api/export/obsidian/${vid.id}/download`);
+      });
     return;
   }
 

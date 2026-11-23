@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy.orm import Session
 
 from backend.app.database import get_db
+from backend.app.models import Video, Flashcard
 from backend.app.models import Video, Flashcard, User
 from backend.app.schemas import ExportRequest
 from backend.app.services.export_obsidian import ObsidianExporter
@@ -14,6 +15,7 @@ from backend.app.services.auth_service import get_current_user_optional
 router = APIRouter(prefix="/api/export", tags=["Routing & Delivery Engine"])
 
 @router.post("/obsidian")
+def export_to_obsidian(payload: ExportRequest, db: Session = Depends(get_db)):
 def export_to_obsidian(
     payload: ExportRequest,
     db: Session = Depends(get_db),
@@ -23,6 +25,7 @@ def export_to_obsidian(
     if not payload.video_id:
         raise HTTPException(status_code=400, detail="video_id is required.")
     
+    video = db.query(Video).filter(Video.id == payload.video_id).first()
     user_filter = (Video.user_id == current_user.id) | (Video.user_id.is_(None) if current_user.id == 1 else False)
     video = db.query(Video).filter(Video.id == payload.video_id, user_filter).first()
     if not video:
@@ -32,12 +35,14 @@ def export_to_obsidian(
     return res
 
 @router.get("/obsidian/{video_id}/download")
+def download_obsidian_markdown(video_id: int, db: Session = Depends(get_db)):
 def download_obsidian_markdown(
     video_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user_optional)
 ):
     """Downloads formatted Obsidian Markdown note directly."""
+    video = db.query(Video).filter(Video.id == video_id).first()
     user_filter = (Video.user_id == current_user.id) | (Video.user_id.is_(None) if current_user.id == 1 else False)
     video = db.query(Video).filter(Video.id == video_id, user_filter).first()
     if not video:
@@ -54,6 +59,7 @@ def download_obsidian_markdown(
     )
 
 @router.post("/anki")
+def export_to_anki(payload: ExportRequest, db: Session = Depends(get_db)):
 def export_to_anki(
     payload: ExportRequest,
     db: Session = Depends(get_db),
@@ -63,6 +69,7 @@ def export_to_anki(
     if not payload.video_id:
         raise HTTPException(status_code=400, detail="video_id is required.")
     
+    video = db.query(Video).filter(Video.id == payload.video_id).first()
     user_filter = (Video.user_id == current_user.id) | (Video.user_id.is_(None) if current_user.id == 1 else False)
     video = db.query(Video).filter(Video.id == payload.video_id, user_filter).first()
     if not video:
@@ -72,12 +79,14 @@ def export_to_anki(
 
 @router.get("/anki/{video_id}/download")
 @router.get("/anki/{video_id}/download-tsv")
+def download_anki_tsv(video_id: int, db: Session = Depends(get_db)):
 def download_anki_tsv(
     video_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user_optional)
 ):
     """Generates and downloads Anki-compatible TSV file for easy card import on desktop or mobile."""
+    video = db.query(Video).filter(Video.id == video_id).first()
     user_filter = (Video.user_id == current_user.id) | (Video.user_id.is_(None) if current_user.id == 1 else False)
     video = db.query(Video).filter(Video.id == video_id, user_filter).first()
     if not video:
@@ -95,6 +104,7 @@ def download_anki_tsv(
     )
 
 @router.post("/notion")
+def export_to_notion(payload: ExportRequest, db: Session = Depends(get_db)):
 def export_to_notion(
     payload: ExportRequest,
     db: Session = Depends(get_db),
@@ -104,6 +114,7 @@ def export_to_notion(
     if not payload.video_id:
         raise HTTPException(status_code=400, detail="video_id is required.")
     
+    video = db.query(Video).filter(Video.id == payload.video_id).first()
     user_filter = (Video.user_id == current_user.id) | (Video.user_id.is_(None) if current_user.id == 1 else False)
     video = db.query(Video).filter(Video.id == payload.video_id, user_filter).first()
     if not video:
@@ -113,3 +124,4 @@ def export_to_notion(
     if not res.get("success"):
         raise HTTPException(status_code=400, detail=res.get("message"))
     return res
+

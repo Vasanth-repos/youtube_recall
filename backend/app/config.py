@@ -1,4 +1,5 @@
 import os
+import sys
 from pathlib import Path
 from typing import List
 from dotenv import load_dotenv
@@ -6,12 +7,19 @@ from dotenv import load_dotenv
 BASE_DIR = Path(__file__).resolve().parent.parent
 ROOT_DIR = BASE_DIR.parent
 
+# When running as a PyInstaller frozen executable, keep the database persistent next to the .exe
+if getattr(sys, "frozen", False):
+    EXE_DIR = Path(sys.executable).resolve().parent
+    DEFAULT_DB_PATH = EXE_DIR / "recall.db"
+else:
+    DEFAULT_DB_PATH = BASE_DIR / "recall.db"
+
 # Automatically load environment variables from .env
 load_dotenv(ROOT_DIR / ".env")
 load_dotenv(BASE_DIR / ".env")
 
 class AppConfig:
-    DATABASE_URL: str = os.getenv("DATABASE_URL", f"sqlite:///{BASE_DIR}/recall.db")
+    DATABASE_URL: str = os.getenv("DATABASE_URL", f"sqlite:///{DEFAULT_DB_PATH.as_posix()}")
     APP_ENV: str = os.getenv("APP_ENV", "development")
     HOST: str = os.getenv("HOST", "0.0.0.0")
     PORT: int = int(os.getenv("PORT", "8000"))

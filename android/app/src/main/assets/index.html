@@ -55,8 +55,11 @@
   </script>
   <!-- Lucide Icons -->
   <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- KaTeX for crisp mathematical formulas & scientific equations -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" crossorigin="anonymous">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js" crossorigin="anonymous"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js" crossorigin="anonymous"></script>
   <link rel="stylesheet" href="styles.css">
-  <link rel="stylesheet" href="/static/styles.css">
 </head>
 <body class="bg-obsidian-950 text-zinc-100 min-h-screen flex flex-col font-sans antialiased selection:bg-amber-500 selection:text-black">
 
@@ -92,6 +95,10 @@
           <i data-lucide="sliders" class="w-3.5 h-3.5"></i>
           <span>Settings</span>
         </button>
+        <button id="nav-auth-btn" onclick="openAuthModal()" class="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs sm:text-sm font-medium text-zinc-400 hover:text-zinc-200 transition-colors border border-transparent hover:border-obsidian-750">
+          <i data-lucide="user" class="w-3.5 h-3.5"></i>
+          <span id="nav-user-label">Account</span>
+        </button>
 
         <button onclick="openCaptureModal()" class="ml-2 flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-amber-500 hover:bg-amber-400 text-zinc-950 transition-colors shadow-sm active:scale-95">
           <i data-lucide="plus" class="w-3.5 h-3.5 stroke-[2.5]"></i>
@@ -101,6 +108,9 @@
 
       <!-- Mobile Top Quick Actions -->
       <div class="flex sm:hidden items-center gap-2">
+        <button id="mob-auth-btn" onclick="openAuthModal()" class="p-1.5 rounded-lg bg-obsidian-850 border border-obsidian-750 text-zinc-400 hover:text-zinc-200">
+          <i data-lucide="user" class="w-4 h-4"></i>
+        </button>
         <button onclick="openCaptureModal()" title="Add Video" class="px-3 py-1.5 rounded-lg bg-amber-500 text-zinc-950 font-bold text-xs flex items-center gap-1 shadow-sm active:scale-95 transition-transform">
           <i data-lucide="plus" class="w-3.5 h-3.5 stroke-[3]"></i>
           <span>Add Video</span>
@@ -169,6 +179,15 @@
       
       <!-- Populated Reader Container -->
       <div id="reader-content" class="space-y-6">
+        <!-- Back Navigation Breadcrumb -->
+        <div class="flex items-center justify-between pt-1">
+          <button onclick="switchTab('library')" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-obsidian-900 hover:bg-obsidian-850 text-xs text-zinc-300 hover:text-amber-400 border border-obsidian-800 transition-colors shadow-sm group">
+            <i data-lucide="arrow-left" class="w-3.5 h-3.5 group-hover:-translate-x-0.5 transition-transform text-amber-400"></i>
+            <span>Back to Library</span>
+          </button>
+          <span class="hidden sm:inline-block text-[11px] font-mono text-zinc-500">Shortcut: Press <kbd class="px-1.5 py-0.5 rounded bg-obsidian-850 border border-obsidian-750 text-zinc-400">Esc</kbd> to return</span>
+        </div>
+
         <!-- Video Header Card (Editorial Publication Style) -->
         <div class="bg-obsidian-900 border border-obsidian-800 rounded-xl p-5 sm:p-7 shadow-sm space-y-4">
           <!-- Metadata Row -->
@@ -210,62 +229,166 @@
               </button>
             </div>
           </div>
+        </div>
 
-          <!-- In-Transcript Realtime Filter -->
-          <div class="relative pt-1">
-            <div class="absolute inset-y-0 left-0 pt-1 pl-3 flex items-center pointer-events-none text-zinc-500">
-              <i data-lucide="search" class="w-3.5 h-3.5"></i>
+        <!-- Micro-Learning View Mode Switcher -->
+        <div class="flex items-center justify-between gap-3 bg-obsidian-900 border border-obsidian-800 p-1.5 rounded-xl">
+          <div class="flex items-center gap-1.5 w-full sm:w-auto">
+            <button id="btn-mode-rapid" onclick="switchReaderMode('rapid')" class="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-semibold bg-amber-500 text-zinc-950 transition-all shadow-sm">
+              <i data-lucide="zap" class="w-3.5 h-3.5 fill-current"></i>
+              <span>⚡ 5-Min Rapid Recall</span>
+            </button>
+            <button id="btn-mode-indepth" onclick="switchReaderMode('indepth')" class="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-medium text-zinc-400 hover:text-zinc-200 hover:bg-obsidian-850 transition-all">
+              <i data-lucide="book-open" class="w-3.5 h-3.5"></i>
+              <span>📖 In-Depth Chapter Reader</span>
+            </button>
+          </div>
+          <div class="hidden sm:flex items-center gap-1.5 text-[11px] text-amber-400 font-mono bg-amber-500/10 border border-amber-500/20 px-2.5 py-1 rounded-md">
+            <span>⏱️ 5-Minute Micro-Learning</span>
+          </div>
+        </div>
+
+        <!-- ============================================================== -->
+        <!-- VIEW 1: 5-Minute Rapid Recall (Default Micro-Learning View)   -->
+        <!-- ============================================================== -->
+        <div id="reader-view-rapid" class="space-y-6">
+          
+          <!-- 1. Executive 60-Second Core Thesis & Rules -->
+          <div class="bg-obsidian-900 border-l-2 border-l-amber-500 border border-obsidian-800 rounded-r-xl p-5 sm:p-6 shadow-sm space-y-3.5">
+            <div class="flex items-center justify-between">
+              <h3 class="text-xs font-semibold uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
+                <i data-lucide="sparkles" class="w-3.5 h-3.5 text-amber-400"></i>
+                <span>Core Mental Model & Thesis</span>
+              </h3>
+              <span class="text-[10px] font-mono uppercase bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2 py-0.5 rounded">60-Sec Read</span>
             </div>
-            <input type="text" id="transcript-filter" onkeyup="filterTranscriptSections()" placeholder="Search within chapters..." class="w-full bg-obsidian-950 border border-obsidian-800 rounded-md pl-9 pr-3 py-1.5 text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none transition-colors">
+            <p id="reader-rapid-thesis" class="text-sm sm:text-base font-serif text-zinc-100 leading-relaxed font-normal">
+              <!-- Rendered via JS -->
+            </p>
+            <div class="pt-2 border-t border-obsidian-800/80">
+              <h4 class="text-[11px] font-mono uppercase tracking-wider text-zinc-400 mb-2">Key Invariants & Rules of Thumb:</h4>
+              <ul id="reader-rapid-rules" class="space-y-1.5 text-xs sm:text-sm text-zinc-200">
+                <!-- Rendered via JS -->
+              </ul>
+            </div>
           </div>
+
+          <!-- 2. Formulas & Equations Deck (for Math / Physics / Engineering) -->
+          <div id="reader-formulas-section" class="hidden bg-obsidian-900 border border-obsidian-800 rounded-xl shadow-sm overflow-hidden">
+            <div class="flex items-center justify-between px-5 sm:px-6 py-4 border-b border-obsidian-800 bg-obsidian-950/40">
+              <h2 class="text-xs font-semibold uppercase tracking-wider text-zinc-200 flex items-center gap-2">
+                <i data-lucide="function-square" class="w-4 h-4 text-amber-400"></i>
+                <span>Formulas & Mathematical Derivations</span>
+              </h2>
+              <span id="formulas-count-badge" class="font-mono text-[11px] px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">0 formulas</span>
+            </div>
+            <div id="reader-formulas-grid" class="p-5 sm:p-6 grid grid-cols-1 gap-4">
+              <!-- Rendered via JS -->
+            </div>
+          </div>
+
+          <!-- 3. Scientific Laws & Core Principles Deck (for Science / Biology / Chemistry / Physics) -->
+          <div id="reader-laws-section" class="hidden bg-obsidian-900 border border-obsidian-800 rounded-xl shadow-sm overflow-hidden">
+            <div class="flex items-center justify-between px-5 sm:px-6 py-4 border-b border-obsidian-800 bg-obsidian-950/40">
+              <h2 class="text-xs font-semibold uppercase tracking-wider text-zinc-200 flex items-center gap-2">
+                <i data-lucide="atom" class="w-4 h-4 text-emerald-400"></i>
+                <span>Scientific Laws, Principles & Core Hypotheses</span>
+              </h2>
+              <span id="laws-count-badge" class="font-mono text-[11px] px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">0 principles</span>
+            </div>
+            <div id="reader-laws-grid" class="p-5 sm:p-6 grid grid-cols-1 gap-4">
+              <!-- Rendered via JS -->
+            </div>
+          </div>
+
+          <!-- 4. Chapter Landmarks (Fast 60-Second Scan) -->
+          <div class="bg-obsidian-900 border border-obsidian-800 rounded-xl shadow-sm overflow-hidden">
+            <div class="flex items-center justify-between px-5 sm:px-6 py-4 border-b border-obsidian-800 bg-obsidian-950/40">
+              <h2 class="text-xs font-semibold uppercase tracking-wider text-zinc-300 flex items-center gap-2">
+                <i data-lucide="map-pin" class="w-3.5 h-3.5 text-amber-400"></i>
+                <span>Chapter Landmarks (Fast Scan)</span>
+              </h2>
+              <span id="rapid-landmarks-count" class="font-mono text-[11px] text-zinc-500">0 landmarks</span>
+            </div>
+            <div id="reader-rapid-landmarks" class="divide-y divide-obsidian-800/70">
+              <!-- Rendered via JS -->
+            </div>
+          </div>
+
+          <!-- 5. 2-Minute Recall Flashcards (Interactive Self-Test) -->
+          <div id="reader-flashcards-section" class="bg-obsidian-900 border border-obsidian-800 rounded-xl shadow-sm overflow-hidden">
+            <div class="flex items-center justify-between px-5 sm:px-6 py-4 border-b border-obsidian-800 bg-obsidian-950/40">
+              <h2 class="text-xs font-semibold uppercase tracking-wider text-zinc-300 flex items-center gap-2">
+                <i data-lucide="help-circle" class="w-3.5 h-3.5 text-amber-400"></i>
+                <span>2-Minute Active Recall Test</span>
+              </h2>
+              <span id="rapid-flashcards-count" class="font-mono text-[11px] text-zinc-500">0 cards</span>
+            </div>
+            <div id="reader-rapid-flashcards" class="p-5 sm:p-6 grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+              <!-- Rendered via JS -->
+            </div>
+          </div>
+
         </div>
 
-        <!-- Executive Key Insights (Editorial Callout) -->
-        <div class="bg-obsidian-900 border-l-2 border-l-amber-500 border border-obsidian-800 rounded-r-xl p-5 sm:p-6 shadow-sm">
-          <h3 class="text-xs font-semibold uppercase tracking-wider text-amber-400/90 mb-3 flex items-center gap-1.5">
-            <i data-lucide="bookmark" class="w-3.5 h-3.5 text-amber-400"></i>
-            Key Insights
-          </h3>
-          <ul id="reader-bullets" class="space-y-2 text-xs sm:text-sm text-zinc-200">
-            <!-- Rendered via JS -->
-          </ul>
-        </div>
+        <!-- ============================================================== -->
+        <!-- VIEW 2: In-Depth Chapter Reader (Long-Form Textbook Reading)   -->
+        <!-- ============================================================== -->
+        <div id="reader-view-indepth" class="hidden space-y-6">
 
-        <!-- Key Concepts Glossary -->
-        <div id="reader-concepts-container" class="bg-obsidian-900 border border-obsidian-800 rounded-xl p-5 shadow-sm">
-          <h3 class="text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-3 flex items-center gap-1.5">
-            <i data-lucide="hash" class="w-3.5 h-3.5 text-zinc-400"></i>
-            Core Terminology
-          </h3>
-          <div id="reader-concepts" class="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
-            <!-- Rendered via JS -->
-          </div>
-        </div>
-
-        <!-- Chapter-by-Chapter Transcript & Synthesis (Single Unified Box) -->
-        <div class="bg-obsidian-900 border border-obsidian-800 rounded-xl shadow-sm overflow-hidden">
-          <!-- Header -->
-          <div class="flex items-center justify-between px-5 sm:px-6 py-4 border-b border-obsidian-800/80 bg-obsidian-950/40">
-            <h2 class="text-xs font-semibold uppercase tracking-wider text-zinc-300 flex items-center gap-2">
-              <i data-lucide="align-left" class="w-3.5 h-3.5 text-amber-400"></i>
-              <span>Chapter Breakdown</span>
-            </h2>
-            <span id="section-count-badge" class="font-mono text-[11px] text-zinc-500">0 chapters</span>
-          </div>
-
-          <!-- Chapter Sections -->
-          <div id="smart-transcript-sections" class="divide-y divide-obsidian-800/80">
-            <!-- Rendered via JS -->
-          </div>
-
-          <!-- Integrated Summary Synthesis -->
-          <div id="reader-synthesis-container" class="border-t border-obsidian-800/80 bg-obsidian-950/25 p-5 sm:p-6 space-y-2">
-            <h3 class="text-[11px] font-semibold uppercase tracking-wider text-amber-400/90 flex items-center gap-1.5">
-              <i data-lucide="sparkles" class="w-3.5 h-3.5 text-amber-400"></i>
-              <span>Synthesis</span>
+          <!-- Executive Key Insights (Editorial Callout) -->
+          <div class="bg-obsidian-900 border-l-2 border-l-amber-500 border border-obsidian-800 rounded-r-xl p-5 sm:p-6 shadow-sm">
+            <h3 class="text-xs font-semibold uppercase tracking-wider text-amber-400/90 mb-3 flex items-center gap-1.5">
+              <i data-lucide="bookmark" class="w-3.5 h-3.5 text-amber-400"></i>
+              Key Insights
             </h3>
-            <p id="reader-synthesis" class="text-xs sm:text-sm text-zinc-300 font-sans leading-relaxed"></p>
+            <ul id="reader-bullets" class="space-y-2 text-xs sm:text-sm text-zinc-200">
+              <!-- Rendered via JS -->
+            </ul>
           </div>
+
+          <!-- Key Concepts Glossary -->
+          <div id="reader-concepts-container" class="bg-obsidian-900 border border-obsidian-800 rounded-xl p-5 shadow-sm">
+            <h3 class="text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-3 flex items-center gap-1.5">
+              <i data-lucide="hash" class="w-3.5 h-3.5 text-zinc-400"></i>
+              Core Terminology & Concepts
+            </h3>
+            <div id="reader-concepts" class="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
+              <!-- Rendered via JS -->
+            </div>
+          </div>
+
+          <!-- Chapter-by-Chapter Transcript & Synthesis -->
+          <div class="bg-obsidian-900 border border-obsidian-800 rounded-xl shadow-sm overflow-hidden">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 sm:px-6 py-4 border-b border-obsidian-800/80 bg-obsidian-950/40">
+              <div class="flex items-center gap-2">
+                <i data-lucide="align-left" class="w-3.5 h-3.5 text-amber-400"></i>
+                <h2 class="text-xs font-semibold uppercase tracking-wider text-zinc-300">In-Depth Chapter Analysis</h2>
+                <span id="section-count-badge" class="font-mono text-[11px] text-zinc-500 ml-1">0 chapters</span>
+              </div>
+
+              <!-- In-Transcript Realtime Filter -->
+              <div class="relative w-full sm:w-64">
+                <div class="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-zinc-500">
+                  <i data-lucide="search" class="w-3.5 h-3.5"></i>
+                </div>
+                <input type="text" id="transcript-filter" onkeyup="filterTranscriptSections()" placeholder="Filter chapters..." class="w-full bg-obsidian-950 border border-obsidian-800 rounded-lg pl-8 pr-3 py-1 text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-amber-500/40 transition-colors">
+              </div>
+            </div>
+
+            <div id="smart-transcript-sections" class="divide-y divide-obsidian-800/80">
+              <!-- Rendered via JS -->
+            </div>
+
+            <div id="reader-synthesis-container" class="border-t border-obsidian-800/80 bg-obsidian-950/25 p-5 sm:p-6 space-y-2">
+              <h3 class="text-[11px] font-semibold uppercase tracking-wider text-amber-400/90 flex items-center gap-1.5">
+                <i data-lucide="sparkles" class="w-3.5 h-3.5 text-amber-400"></i>
+                <span>Synthesis</span>
+              </h3>
+              <p id="reader-synthesis" class="text-xs sm:text-sm text-zinc-300 font-sans leading-relaxed"></p>
+            </div>
+          </div>
+
         </div>
       </div>
 
@@ -355,9 +478,123 @@
             </button>
           </div>
         </div>
+
+        <!-- User Account & Security (Phase 1 Multi-Tenancy) -->
+        <div class="bg-obsidian-900 border border-obsidian-800 rounded-xl p-5 space-y-4">
+          <div class="flex items-center justify-between">
+            <h3 class="text-xs font-semibold uppercase tracking-wider text-zinc-300 flex items-center gap-2">
+              <i data-lucide="shield-check" class="w-4 h-4 text-amber-400"></i>
+              Account &amp; Security
+            </h3>
+            <span id="account-status-badge" class="px-2.5 py-0.5 rounded-full text-[10px] font-mono bg-zinc-800 text-zinc-400 border border-zinc-700">
+              Guest Workspace
+            </span>
+          </div>
+          <p id="account-desc-text" class="text-xs text-zinc-400 leading-relaxed">
+            Sign in or create a private account to isolate your library, flashcards, and study notes with JWT authentication.
+          </p>
+          <div id="account-logged-in-box" class="hidden p-3.5 rounded-lg bg-obsidian-950 border border-obsidian-800 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <div class="w-9 h-9 rounded-full bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 font-bold text-sm" id="account-avatar-initials">
+                U
+              </div>
+              <div>
+                <div class="text-xs font-semibold text-zinc-200" id="account-user-name">User Name</div>
+                <div class="text-[11px] font-mono text-zinc-500" id="account-user-email">user@example.com</div>
+              </div>
+            </div>
+            <button onclick="logoutUser()" class="px-3 py-1.5 rounded-lg bg-obsidian-850 hover:bg-rose-950/40 border border-obsidian-750 hover:border-rose-500/30 text-xs text-zinc-400 hover:text-rose-400 font-medium transition-colors">
+              Sign Out
+            </button>
+          </div>
+          <div id="account-logged-out-box" class="flex items-center gap-2 pt-1">
+            <button onclick="openAuthModal('login')" class="px-3.5 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-zinc-950 text-xs font-semibold transition-colors active:scale-95 shadow-sm">
+              Sign In / Register
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   </main>
+
+  <!-- Auth & Account Modal (Phase 1 Multi-Tenancy & JWT Auth) -->
+  <div id="auth-modal" onclick="if(event.target.id==='auth-modal') closeAuthModal()" class="hidden fixed inset-0 z-50 overflow-y-auto bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 modal-overlay">
+    <div class="bg-obsidian-900 border border-obsidian-800 rounded-2xl w-full max-w-md p-6 shadow-2xl modal-content" onclick="event.stopPropagation()">
+      <div class="flex items-center justify-between pb-3 border-b border-obsidian-800 mb-4">
+        <h3 class="text-xs font-semibold uppercase tracking-wider text-zinc-200 flex items-center gap-2">
+          <i data-lucide="shield" class="w-4 h-4 text-amber-400"></i>
+          <span id="auth-modal-title">Account Access</span>
+        </h3>
+        <button onclick="closeAuthModal()" class="p-1 rounded-md text-zinc-500 hover:text-zinc-200 hover:bg-obsidian-800 transition-colors">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <!-- Auth Mode Tabs -->
+      <div id="auth-tabs-row" class="grid grid-cols-2 gap-1 p-1 bg-obsidian-950 rounded-lg border border-obsidian-800 mb-4">
+        <button id="auth-tab-login" onclick="switchAuthTab('login')" class="py-1.5 rounded text-xs font-medium bg-obsidian-800 text-zinc-100 transition-colors">
+          Sign In
+        </button>
+        <button id="auth-tab-register" onclick="switchAuthTab('register')" class="py-1.5 rounded text-xs font-medium text-zinc-400 hover:text-zinc-200 transition-colors">
+          Create Account
+        </button>
+      </div>
+
+      <!-- Sign In Form -->
+      <div id="auth-login-form" class="space-y-3.5">
+        <div>
+          <label class="block text-xs font-medium text-zinc-400 mb-1">Email</label>
+          <input type="email" id="auth-login-email" onkeydown="if(event.key==='Enter') submitLogin()" placeholder="you@example.com" class="w-full bg-obsidian-950 border border-obsidian-800 rounded-lg px-3.5 py-2.5 text-xs sm:text-sm text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-amber-500/50">
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-zinc-400 mb-1">Password</label>
+          <input type="password" id="auth-login-password" onkeydown="if(event.key==='Enter') submitLogin()" placeholder="••••••••" class="w-full bg-obsidian-950 border border-obsidian-800 rounded-lg px-3.5 py-2.5 text-xs sm:text-sm text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-amber-500/50">
+        </div>
+        <button id="btn-submit-login" onclick="submitLogin()" class="w-full py-2.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-zinc-950 text-xs font-bold transition-colors shadow-sm active:scale-95">
+          Sign In
+        </button>
+      </div>
+
+      <!-- Register Form -->
+      <div id="auth-register-form" class="hidden space-y-3.5">
+        <div>
+          <label class="block text-xs font-medium text-zinc-400 mb-1">Full Name</label>
+          <input type="text" id="auth-register-name" placeholder="Alex Johnson" class="w-full bg-obsidian-950 border border-obsidian-800 rounded-lg px-3.5 py-2.5 text-xs sm:text-sm text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-amber-500/50">
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-zinc-400 mb-1">Email</label>
+          <input type="email" id="auth-register-email" placeholder="you@example.com" class="w-full bg-obsidian-950 border border-obsidian-800 rounded-lg px-3.5 py-2.5 text-xs sm:text-sm text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-amber-500/50">
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-zinc-400 mb-1">Password (min 6 characters)</label>
+          <input type="password" id="auth-register-password" onkeydown="if(event.key==='Enter') submitRegister()" placeholder="••••••••" class="w-full bg-obsidian-950 border border-obsidian-800 rounded-lg px-3.5 py-2.5 text-xs sm:text-sm text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-amber-500/50">
+        </div>
+        <button id="btn-submit-register" onclick="submitRegister()" class="w-full py-2.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-zinc-950 text-xs font-bold transition-colors shadow-sm active:scale-95">
+          Create Account
+        </button>
+      </div>
+
+      <!-- Authenticated Profile View (when opened while already signed in) -->
+      <div id="auth-profile-form" class="hidden space-y-4">
+        <div class="p-4 rounded-xl bg-obsidian-950 border border-obsidian-800 flex items-center gap-3.5">
+          <div class="w-12 h-12 rounded-full bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 font-bold text-lg" id="auth-modal-avatar">
+            U
+          </div>
+          <div>
+            <div class="text-sm font-semibold text-zinc-100" id="auth-modal-name">User Name</div>
+            <div class="text-xs font-mono text-zinc-400" id="auth-modal-email">user@example.com</div>
+            <div class="text-[10px] text-amber-400 font-mono mt-0.5">● Private Tenant Workspace</div>
+          </div>
+        </div>
+        <button onclick="logoutUser()" class="w-full py-2.5 rounded-lg bg-obsidian-850 hover:bg-rose-950/40 border border-obsidian-750 hover:border-rose-500/30 text-xs font-semibold text-zinc-300 hover:text-rose-400 transition-colors">
+          Sign Out of Account
+        </button>
+      </div>
+
+      <!-- Feedback / Error Message Container -->
+      <div id="auth-feedback" class="hidden mt-3 p-2.5 rounded-lg text-xs font-medium"></div>
+    </div>
+  </div>
 
   <!-- Add Video Modal -->
   <div id="capture-modal" onclick="handleModalBackdropClick(event)" class="hidden fixed inset-0 z-50 overflow-y-auto bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 modal-overlay">

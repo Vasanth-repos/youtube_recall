@@ -13,4 +13,9 @@ android/app/build/
 android/local.properties
 *.hprof
 
+# Packaging Artifacts
+build/
+dist/
+.vscode/
+
 

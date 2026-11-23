@@ -106,7 +106,12 @@ def health_check():
     }
 
 # Serve Frontend static directory if exists
-FRONTEND_DIR = Path(__file__).resolve().parent.parent.parent / "frontend"
+import sys
+if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
+    FRONTEND_DIR = Path(sys._MEIPASS) / "frontend"
+else:
+    FRONTEND_DIR = Path(__file__).resolve().parent.parent.parent / "frontend"
+
 if FRONTEND_DIR.exists():
     app.mount("/static", StaticFiles(directory=str(FRONTEND_DIR)), name="static")
 
