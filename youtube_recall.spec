@@ -8,6 +8,8 @@ project_root = os.path.abspath(SPECPATH)
 datas = [
     (os.path.join(project_root, 'frontend'), 'frontend'),
 ]
+if os.path.exists(os.path.join(project_root, '.env')):
+    datas.append((os.path.join(project_root, '.env'), '.'))
 
 hiddenimports = [
     'uvicorn',

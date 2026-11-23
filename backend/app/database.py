@@ -99,6 +99,18 @@ def init_db():
                 )
                 db.add(guest)
                 db.commit()
+
+            # Ensure default AppSetting keys are initialized
+            from backend.app.models import AppSetting
+            gemini_setting = db.query(AppSetting).filter(AppSetting.key == "GEMINI_API_KEY").first()
+            if not gemini_setting:
+                db.add(AppSetting(key="GEMINI_API_KEY", value=settings.GEMINI_API_KEY))
+                db.commit()
+
+            prov_setting = db.query(AppSetting).filter(AppSetting.key == "DEFAULT_AI_PROVIDER").first()
+            if not prov_setting:
+                db.add(AppSetting(key="DEFAULT_AI_PROVIDER", value="gemini"))
+                db.commit()
     except Exception:
         pass
 

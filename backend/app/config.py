@@ -11,6 +11,9 @@ ROOT_DIR = BASE_DIR.parent
 if getattr(sys, "frozen", False):
     EXE_DIR = Path(sys.executable).resolve().parent
     DEFAULT_DB_PATH = EXE_DIR / "recall.db"
+    load_dotenv(EXE_DIR / ".env")
+    load_dotenv(EXE_DIR.parent / ".env")
+    load_dotenv(Path.cwd() / ".env")
 else:
     DEFAULT_DB_PATH = BASE_DIR / "recall.db"
 

@@ -22,6 +22,8 @@ STRICT INSTRUCTION ON CONCEPTUAL DEPTH AND MATH/SCIENCE REVISION:
 - If the video covers Complex Numbers, Calculus, Physics, Chemistry, or Engineering, write out the ACTUAL equations in clean LaTeX notation (e.g. $$i = \\\\sqrt{{-1}}$$, $$i^2 = -1$$, $$i^3 = -i$$, $$i^4 = 1$$, $$i^{{4k+r}} = i^r$$, $$a^m \\\\cdot a^n = a^{{m+n}}$$, etc.).
 - TRANSLATE AND FORMALIZE ALL CONCEPTS INTO CRYSTAL-CLEAR ENGLISH WITH PRECISE MATHEMATICAL NOTATION.
 - In `smart_transcript`, each chapter's `crisp_points` must teach the ACTUAL MATHEMATICAL RULES and SOLVED EXAMPLES (e.g. "To simplify $$i^{{17}}$$, express as $$i^{{16}} \\\\cdot i = (i^4)^4 \\\\cdot i = 1 \\\\cdot i = i$$"), NOT just saying "Exercises are solved".
+- SPEECH-TO-TEXT NOISE & TRANSCRIPT CORRECTION:
+  YouTube automated speech recognition often mishears technical terms, equations, or regional accents. You must rely on the academic topic defined by Video Title ({title}) and Channel ({channel}) to deduce the true educational subject, correct all equations and problem numbers, and generate mathematically and scientifically accurate chapters, formulas, and explanations in pristine English.
 
 A student or professional should be able to review this guide in under 5 minutes and immediately recall:
 1. The Core Mental Model / Central Thesis (read in 30 seconds).
@@ -224,7 +226,7 @@ class AIService:
     @classmethod
     def test_gemini_key(cls, api_key: str) -> Dict[str, Any]:
         """Validates a Gemini API key with live high-speed candidate models."""
-        candidate_models = ["gemini-flash-lite-latest", "gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-3.8-flash"]
+        candidate_models = ["gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-3.8-flash", "gemini-flash-latest"]
         for model in candidate_models:
             url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
             payload = {
@@ -370,11 +372,10 @@ class AIService:
     def _call_gemini(cls, prompt: str, api_key: str) -> Optional[Dict[str, Any]]:
         """Calls Google AI Studio / Gemini API using candidate models with automatic fallback."""
         candidate_models = [
-            "gemini-flash-latest",
-            "gemini-flash-lite-latest",
-            "gemini-3.5-flash",
             "gemini-3.5-flash-lite",
-            "gemini-2.5-flash",
+            "gemini-3.5-flash",
+            "gemini-3.8-flash",
+            "gemini-flash-latest",
             "gemini-pro-latest"
         ]
         for model in candidate_models:
@@ -387,7 +388,7 @@ class AIService:
                 }
             }
             try:
-                resp = requests.post(url, json=payload, timeout=30)
+                resp = requests.post(url, json=payload, timeout=25)
                 if resp.status_code == 200:
                     data = resp.json()
                     candidates = data.get("candidates", [])
@@ -757,30 +758,46 @@ class AIService:
                 if len(formulas) >= 4:
                     break
 
-        science_patterns = [
-            (r'(radius of convergence|convergence)', "Radius of Convergence Principle", "Power series converge within distance R from expansion center.", "Outside this radius, higher-order polynomial terms diverge to infinity."),
-            (r'(conservation of energy|first law)', "First Law of Thermodynamics (Energy Conservation)", "Total energy in an isolated system remains constant.", "Energy is transformed between kinetic, potential, and thermal forms."),
-            (r'(second law|entropy)', "Second Law of Thermodynamics (Entropy Increase)", "Total entropy of an isolated system always increases over time.", "Spontaneous processes proceed towards maximum thermodynamic probability."),
-            (r'(newton|f\s*=\s*ma|force)', "Newton's Second Law of Motion", "Force equals the rate of change of momentum (F = ma).", "Net applied force accelerates mass inversely proportional to inertia."),
-            (r'(quantum|uncertainty principle)', "Heisenberg Uncertainty Principle", "Cannot simultaneously determine precise position and momentum.", "Fundamental wave-particle duality property of physical quantum states."),
-            (r'(central dogma|dna|rna)', "Central Dogma of Molecular Biology", "Genetic information flows unidirectionally: DNA -> RNA -> Protein.", "Transcription creates messenger RNA; translation synthesizes functional polypeptides.")
-        ]
-        for pat, lname, lstmt, lmech in science_patterns:
-            if re.search(pat, full_text_and_title):
-                ts_lbl = "00:00"
-                if chunks:
-                    for ch in chunks:
-                        if re.search(pat, ch.get("content", "").lower()):
-                            ts_lbl = ch.get("timestamp_label", "00:00")
-                            break
-                laws_and_principles.append({
-                    "name": lname,
-                    "statement": lstmt,
-                    "mechanism": lmech,
-                    "timestamp_label": ts_lbl
-                })
-                if len(laws_and_principles) >= 3:
-                    break
+        if is_science and not is_math:
+            science_patterns = [
+                (r'\b(radius of convergence|convergence)\b', "Radius of Convergence Principle", "Power series converge within distance R from expansion center.", "Outside this radius, higher-order polynomial terms diverge to infinity."),
+                (r'\b(conservation of energy|first law)\b', "First Law of Thermodynamics (Energy Conservation)", "Total energy in an isolated system remains constant.", "Energy is transformed between kinetic, potential, and thermal forms."),
+                (r'\b(second law|entropy)\b', "Second Law of Thermodynamics (Entropy Increase)", "Total entropy of an isolated system always increases over time.", "Spontaneous processes proceed towards maximum thermodynamic probability."),
+                (r'\b(newton|f\s*=\s*ma|force)\b', "Newton's Second Law of Motion", "Force equals the rate of change of momentum (F = ma).", "Net applied force accelerates mass inversely proportional to inertia."),
+                (r'\b(quantum|uncertainty principle)\b', "Heisenberg Uncertainty Principle", "Cannot simultaneously determine precise position and momentum.", "Fundamental wave-particle duality property of physical quantum states."),
+                (r'\b(central dogma|dna replication)\b', "Central Dogma of Molecular Biology", "Genetic information flows unidirectionally: DNA -> RNA -> Protein.", "Transcription creates messenger RNA; translation synthesizes functional polypeptides.")
+            ]
+            for pat, lname, lstmt, lmech in science_patterns:
+                if re.search(pat, full_text_and_title, re.IGNORECASE):
+                    ts_lbl = "00:00"
+                    if chunks:
+                        for ch in chunks:
+                            if re.search(pat, ch.get("content", "").lower()):
+                                ts_lbl = ch.get("timestamp_label", "00:00")
+                                break
+                    laws_and_principles.append({
+                        "name": lname,
+                        "statement": lstmt,
+                        "mechanism": lmech,
+                        "timestamp_label": ts_lbl
+                    })
+                    if len(laws_and_principles) >= 3:
+                        break
+        elif is_math:
+            math_laws = [
+                (r'(imaginary unit|complex number|power of i)', "Modulo-4 Periodicity of Powers of i", "Powers of the imaginary unit cycle strictly through {i, -1, -i, 1}.", "The exponent modulo 4 determines the exact value: i^(4k+r) = i^r."),
+                (r'(consecutive|four term|zero)', "Consecutive Four-Term Zero Sum Rule", "Any sequence of four consecutive integral powers of i identically sums to zero.", "Factorization yields i^n(1 + i - 1 - i) = 0.")
+            ]
+            for pat, lname, lstmt, lmech in math_laws:
+                if re.search(pat, full_text_and_title, re.IGNORECASE):
+                    laws_and_principles.append({
+                        "name": lname,
+                        "statement": lstmt,
+                        "mechanism": lmech,
+                        "timestamp_label": "00:00"
+                    })
+                    if len(laws_and_principles) >= 2:
+                        break
 
         clean_bullets = [b for b in bullets if is_clean_english(b)] or fallback_bullets
 
