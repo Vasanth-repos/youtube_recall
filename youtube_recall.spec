@@ -62,6 +62,13 @@ hiddenimports = [
     'backend.app.services.export_obsidian',
     'backend.app.services.export_anki',
     'backend.app.services.export_notion',
+    'webview',
+    'webview.platforms',
+    'webview.platforms.winforms',
+    'clr',
+    'pythonnet',
+    'bottle',
+    'proxy_tools',
 ]
 
 a = Analysis(
@@ -100,7 +107,7 @@ exe = EXE(
     upx=True,
     upx_exclude=[],
     runtime_tmpdir=None,
-    console=True,
+    console=False,
     disable_windowed_traceback=False,
     target_arch=None,
     codesign_identity=None,
