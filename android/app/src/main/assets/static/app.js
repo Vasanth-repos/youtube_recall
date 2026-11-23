@@ -441,7 +441,7 @@ async function distillVideoOnDevice(videoId) {
     (document.getElementById("setting-gemini-key") ? document.getElementById("setting-gemini-key").value.trim() : "");
 
   let result = null;
-  const candidateModels = ["gemini-flash-latest", "gemini-flash-lite-latest", "gemini-3.5-flash", "gemini-2.5-flash", "gemini-pro-latest"];
+  const candidateModels = ["gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-3.8-flash", "gemini-flash-latest"];
 
   if (geminiKey) {
     const prompt = `You are an expert technical educator and editor.
@@ -585,27 +585,75 @@ Return ONLY valid JSON matching this schema.`;
 }
 
 function generateLocalFallbackDistillation(title, channel, videoId) {
-  const isMath = /math|calculus|algebra|series|derivative|integral|equation|matrix/i.test(title);
-  const isScience = /science|physics|chem|bio|quantum|thermo|gravity|relativity/i.test(title);
+  const isComplex = /complex|imaginary|i\^|power of i/i.test(title);
+  const isMath = isComplex || /math|calculus|algebra|series|derivative|integral|equation|matrix/i.test(title);
+  const isScience = !isMath && /science|physics|chem|bio|quantum|thermo|gravity|relativity/i.test(title);
 
-  const formulas = isMath ? [
-    {
-      name: "Core Mathematical Expansion",
-      formula_latex: "$$f(x) = \\sum_{n=0}^{\\infty} \\frac{f^{(n)}(a)}{n!}(x - a)^n$$",
-      variables: "f^(n)(a): n-th derivative at expansion point a; n!: factorial scaling; x: input variable",
-      explanation: "Approximates non-polynomial functions through systematic derivative alignment.",
-      timestamp_label: "03:30"
-    }
-  ] : [];
+  let formulas = [];
+  if (isComplex) {
+    formulas = [
+      {
+        name: "Fundamental Identity of the Imaginary Unit",
+        formula_latex: "$$i = \\sqrt{-1} \\implies i^2 = -1, \\quad i^3 = -i, \\quad i^4 = 1$$",
+        variables: "i: imaginary unit (orthogonal unit on the complex plane)",
+        explanation: "Defines the fundamental imaginary unit and establishing the cyclical 4-period reduction identity.",
+        timestamp_label: "00:00"
+      },
+      {
+        name: "Modulo 4 Exponent Reduction Theorem",
+        formula_latex: "$$i^n = i^{4k+r} = i^r \\quad (r \\in \\{0, 1, 2, 3\\})$$",
+        variables: "n: integral exponent; k: quotient; r: remainder modulo 4",
+        explanation: "Reduces arbitrarily large exponents of i to fundamental values {1, i, -1, -i} using remainder modulo 4.",
+        timestamp_label: "03:02"
+      }
+    ];
+  } else if (isMath) {
+    formulas = [
+      {
+        name: "Core Mathematical Expansion",
+        formula_latex: "$$f(x) = \\sum_{n=0}^{\\infty} \\frac{f^{(n)}(a)}{n!}(x - a)^n$$",
+        variables: "f^(n)(a): n-th derivative at expansion point a; n!: factorial scaling; x: input variable",
+        explanation: "Approximates non-polynomial functions through systematic derivative alignment.",
+        timestamp_label: "03:30"
+      }
+    ];
+  }
 
-  const laws = isScience || isMath ? [
-    {
-      name: isMath ? "Radius of Convergence Principle" : "Fundamental Conservation Principle",
-      statement: isMath ? "An infinite power series converges strictly within distance R from the center point." : "Total quantity in an isolated physical system remains invariant over time.",
-      mechanism: isMath ? "Higher-order terms diverge exponentially outside the radius of convergence." : "Symmetry of natural laws guarantees conserved conjugate invariants.",
-      timestamp_label: "07:15"
-    }
-  ] : [];
+  let laws = [];
+  if (isComplex) {
+    laws = [
+      {
+        name: "Cyclic Periodicity Principle of Imaginary Powers",
+        statement: "The sequence of integer powers of i is strictly periodic with fundamental period 4.",
+        mechanism: "Because i^4 = 1, multiplying by i^4 leaves any expression invariant: i^(n+4) = i^n * i^4 = i^n.",
+        timestamp_label: "03:02"
+      },
+      {
+        name: "Zero-Sum Rule for Four Consecutive Powers",
+        statement: "Any sequence of four consecutive integral powers of i identically sums to zero.",
+        mechanism: "Factorization yields i^n(1 + i - 1 - i) = i^n(0) = 0.",
+        timestamp_label: "06:04"
+      }
+    ];
+  } else if (isMath) {
+    laws = [
+      {
+        name: "Radius of Convergence Principle",
+        statement: "An infinite power series converges strictly within distance R from the center point.",
+        mechanism: "Higher-order terms diverge exponentially outside the radius of convergence.",
+        timestamp_label: "07:15"
+      }
+    ];
+  } else if (isScience) {
+    laws = [
+      {
+        name: "Fundamental Conservation Principle",
+        statement: "Total quantity in an isolated physical system remains invariant over time.",
+        mechanism: "Symmetry of natural laws guarantees conserved conjugate invariants.",
+        timestamp_label: "07:15"
+      }
+    ];
+  }
 
   return {
     summary_bullets: [
