@@ -5,7 +5,6 @@ from sqlalchemy.orm import Session
 from sqlalchemy import desc, func
 
 from backend.app.database import get_db
-from backend.app.models import Flashcard, ReviewLog, Video
 from backend.app.models import Flashcard, ReviewLog, Video, User
 from backend.app.schemas import FlashcardResponse, ReviewAnswerRequest, ReviewLogResponse, SystemStats
 from backend.app.services.spaced_repetition import SpacedRepetitionService
@@ -17,7 +16,6 @@ def utcnow():
     return datetime.now(timezone.utc)
 
 @router.get("/due", response_model=List[FlashcardResponse])
-def get_due_flashcards(limit: int = 50, db: Session = Depends(get_db)):
 def get_due_flashcards(
     limit: int = 50,
     db: Session = Depends(get_db),
@@ -29,7 +27,6 @@ def get_due_flashcards(
     cards = (
         db.query(Flashcard)
         .join(Video)
-        .filter(Flashcard.next_review_at <= now)
         .filter(Flashcard.next_review_at <= now, user_filter)
         .order_by(Flashcard.next_review_at)
         .limit(limit)
@@ -42,9 +39,6 @@ def get_due_flashcards(
     return cards
 
 @router.get("/all", response_model=List[FlashcardResponse])
-def get_all_flashcards(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    """Retrieves all flashcards with pagination."""
-    cards = db.query(Flashcard).order_by(desc(Flashcard.created_at)).offset(skip).limit(limit).all()
 def get_all_flashcards(
     skip: int = 0,
     limit: int = 100,
@@ -67,7 +61,6 @@ def get_all_flashcards(
     return cards
 
 @router.post("/{card_id}/review", response_model=FlashcardResponse)
-def submit_card_review(card_id: int, payload: ReviewAnswerRequest, db: Session = Depends(get_db)):
 def submit_card_review(
     card_id: int,
     payload: ReviewAnswerRequest,
@@ -79,7 +72,6 @@ def submit_card_review(
     Updates next revision date according to:
     Immediately (0d) -> 1d -> 3d -> 7d -> 15d -> 30d -> 60d -> 90d -> 180d
     """
-    card = db.query(Flashcard).filter(Flashcard.id == card_id).first()
     user_filter = (Flashcard.user_id == current_user.id) | (Flashcard.user_id.is_(None) if current_user.id == 1 else False)
     card = db.query(Flashcard).filter(Flashcard.id == card_id, user_filter).first()
     if not card:
@@ -122,20 +114,12 @@ def submit_card_review(
     return card
 
 @router.get("/stats", response_model=SystemStats)
-def get_system_stats(db: Session = Depends(get_db)):
-    """Computes total videos, total flashcards, due today, mastered, and completed reviews."""
 def get_system_stats(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user_optional)
 ):
     """Computes total videos, total flashcards, due today, mastered, and completed reviews scoped to user."""
     now = utcnow()
-    total_videos = db.query(func.count(Video.id)).scalar() or 0
-    processed_videos = db.query(func.count(Video.id)).filter(Video.status == "PROCESSED").scalar() or 0
-    total_flashcards = db.query(func.count(Flashcard.id)).scalar() or 0
-    cards_due_today = db.query(func.count(Flashcard.id)).filter(Flashcard.next_review_at <= now).scalar() or 0
-    cards_mastered = db.query(func.count(Flashcard.id)).filter(Flashcard.status == "MASTERED").scalar() or 0
-    total_reviews = db.query(func.count(ReviewLog.id)).scalar() or 0
     v_filter = (Video.user_id == current_user.id) | (Video.user_id.is_(None) if current_user.id == 1 else False)
     f_filter = (Flashcard.user_id == current_user.id) | (Flashcard.user_id.is_(None) if current_user.id == 1 else False)
 
@@ -154,4 +138,3 @@ def get_system_stats(
         cards_mastered=cards_mastered,
         total_reviews_completed=total_reviews
     )
-

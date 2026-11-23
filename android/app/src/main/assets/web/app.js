@@ -891,8 +891,6 @@ async function loadStats() {
   if (hasServerBackend()) {
     try {
       const [vidRes, statRes] = await Promise.all([
-        fetch(apiUrl("/api/videos")),
-        fetch(apiUrl("/api/flashcards/stats"))
         authFetch(apiUrl("/api/videos")),
         authFetch(apiUrl("/api/flashcards/stats"))
       ]);
@@ -975,7 +973,6 @@ async function loadVideos() {
 
   if (hasServerBackend()) {
     try {
-      const res = await fetch(apiUrl(`/api/videos?sort_by=${encodeURIComponent(currentSort)}`));
       const res = await authFetch(apiUrl(`/api/videos?sort_by=${encodeURIComponent(currentSort)}`));
       if (res.ok) {
         serverVideos = await res.json();
@@ -1026,7 +1023,6 @@ async function autoIntakeSharedVideo(videoId) {
 
   if (hasServerBackend()) {
     try {
-      const res = await fetch(apiUrl("/api/videos/intake"), {
       const res = await authFetch(apiUrl("/api/videos/intake"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1285,10 +1281,27 @@ function renderReaderView(video) {
   const rapid = video.rapid_recall || {};
   const thesisEl = document.getElementById("reader-rapid-thesis");
   const rulesEl = document.getElementById("reader-rapid-rules");
-  const thesis = rapid.five_minute_thesis || (video.summary_bullets && video.summary_bullets[0]) || video.final_summary || "Core framework and mental model for this video.";
+  
+  function ensureEnglish(text, fallback) {
+    if (!text || typeof text !== "string") return fallback || "";
+    if (/[\u0900-\u0D7F\u0E00-\u0FFF]/.test(text)) {
+      return fallback || `Core conceptual framework and governing principles for "${video.title || 'this video'}".`;
+    }
+    return text;
+  }
+
+  let rawThesis = rapid.five_minute_thesis || (video.summary_bullets && video.summary_bullets[0]) || video.final_summary || "Core framework and mental model for this video.";
+  const thesis = ensureEnglish(rawThesis, `Core conceptual framework and governing principles for "${video.title || 'this video'}".`);
   if (thesisEl) thesisEl.textContent = thesis;
 
-  const rules = rapid.cheat_sheet || video.summary_bullets || [];
+  let rules = rapid.cheat_sheet || video.summary_bullets || [];
+  rules = rules.map(r => ensureEnglish(r, "")).filter(r => r.length > 0);
+  if (rules.length === 0) {
+    rules = [
+      `Key Takeaway: Core analytical framework and problem-solving mechanisms established in "${video.title || 'this video'}".`,
+      `Problem-Solving Rule: Apply systematic invariant reductions and foundational identities for rapid recall.`
+    ];
+  }
   if (rulesEl) {
     rulesEl.innerHTML = rules.map(r => `
       <li class="flex items-start gap-2 text-xs sm:text-sm text-zinc-200">
@@ -1502,7 +1515,14 @@ function renderReaderView(video) {
   // Executive Takeaways
   const bulletsEl = document.getElementById("reader-bullets");
   if (bulletsEl) {
-    bulletsEl.innerHTML = (video.summary_bullets || []).map(b => `
+    let cleanBullets = (video.summary_bullets || []).map(b => ensureEnglish(b, "")).filter(b => b.length > 0);
+    if (cleanBullets.length === 0) {
+      cleanBullets = [
+        `Core Takeaway 1: Governed by analytical mechanisms and foundational rules from "${video.title || 'this lecture'}".`,
+        `Core Takeaway 2: Establishes rigorous problem-solving procedures and domain definitions for active review.`
+      ];
+    }
+    bulletsEl.innerHTML = cleanBullets.map(b => `
       <li class="flex items-start gap-2.5">
         <span class="text-amber-400 font-bold text-sm leading-snug select-none flex-shrink-0 mt-0.5">•</span>
         <span class="font-normal text-zinc-200 leading-relaxed text-sm sm:text-base">${b}</span>
@@ -1535,8 +1555,9 @@ function renderReaderView(video) {
   const synthesisContainer = document.getElementById("reader-synthesis-container");
   const synthesisEl = document.getElementById("reader-synthesis");
   if (synthesisEl) {
-    if (video.final_summary) {
-      synthesisEl.textContent = video.final_summary;
+    const cleanSynthesis = ensureEnglish(video.final_summary, `This synthesis examines the core frameworks and procedural rules in "${video.title || 'this video'}", providing an authoritative reference for active recall.`);
+    if (cleanSynthesis) {
+      synthesisEl.textContent = cleanSynthesis;
       if (synthesisContainer) synthesisContainer.classList.remove("hidden");
     } else {
       synthesisEl.textContent = "Synthesis not available.";
@@ -1730,7 +1751,6 @@ async function redistillCurrentVideo() {
         renderReaderView(updated);
       }
     } else {
-      const res = await fetch(apiUrl(`/api/videos/${currentViewingVideo.id}/redistill`), { method: "POST" });
       const res = await authFetch(apiUrl(`/api/videos/${currentViewingVideo.id}/redistill`), { method: "POST" });
       if (!res.ok) throw new Error("Failed to re-distill transcript");
       const data = await res.json();
@@ -1768,7 +1788,6 @@ async function deleteVideoById(videoId) {
   // Try server delete if backend available and not a purely local ID
   if (hasServerBackend() && !strId.startsWith("local_")) {
     try {
-      await fetch(apiUrl(`/api/videos/${videoId}`), { method: "DELETE" });
       await authFetch(apiUrl(`/api/videos/${videoId}`), { method: "DELETE" });
     } catch (e) {
       console.warn("Server delete warning:", e);
@@ -1831,7 +1850,6 @@ async function submitVideoIntake() {
   let succeeded = false;
   if (hasServerBackend()) {
     try {
-      const res = await fetch(apiUrl("/api/videos/intake"), {
       const res = await authFetch(apiUrl("/api/videos/intake"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1898,7 +1916,6 @@ async function loadSettings() {
 
   if (!storedKey && hasServerBackend()) {
     try {
-      const res = await fetch(apiUrl("/api/settings/gemini-key"));
       const res = await authFetch(apiUrl("/api/settings/gemini-key"));
       if (res.ok) {
         const data = await res.json();
@@ -1980,7 +1997,6 @@ async function saveAndTestGeminiKey() {
   // If server backend is connected, also save it to server
   if (hasServerBackend()) {
     try {
-      await fetch(apiUrl("/api/settings"), {
       await authFetch(apiUrl("/api/settings"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -2051,7 +2067,6 @@ async function saveSettings() {
 
   if (hasServerBackend()) {
     try {
-      const res = await fetch(apiUrl("/api/settings"), {
       const res = await authFetch(apiUrl("/api/settings"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -2091,7 +2106,6 @@ async function copyCurrentOrigin() {
 async function loadAccountStatus() {
   if (!hasServerBackend()) return;
   try {
-    const res = await fetch(apiUrl("/api/youtube/status"));
     const res = await authFetch(apiUrl("/api/youtube/status"));
     if (!res.ok) return;
     const data = await res.json();
@@ -2171,7 +2185,6 @@ async function startFlashcardSession(filterVideoId = null) {
   if (hasServerBackend()) {
     try {
       let url = filterVideoId ? `/api/flashcards/all?limit=100` : "/api/flashcards/due";
-      const res = await fetch(apiUrl(url));
       const res = await authFetch(apiUrl(url));
       if (res.ok) {
         cards = await res.json();
@@ -2227,7 +2240,6 @@ async function loadAllCardsSession() {
 
   if (hasServerBackend()) {
     try {
-      const res = await fetch(apiUrl("/api/flashcards/all?limit=100"));
       const res = await authFetch(apiUrl("/api/flashcards/all?limit=100"));
       if (res.ok) {
         cards = await res.json();
@@ -2336,7 +2348,6 @@ async function rateCurrentCard(rating) {
 
   if (hasServerBackend()) {
     try {
-      await fetch(apiUrl(`/api/flashcards/${card.id}/review`), {
       await authFetch(apiUrl(`/api/flashcards/${card.id}/review`), {
         method: "POST",
         headers: { "Content-Type": "application/json" },

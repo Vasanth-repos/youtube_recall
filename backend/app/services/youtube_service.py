@@ -205,8 +205,51 @@ class YouTubeService:
             })
             full_text_parts.append(text)
 
-        clean_text = " ".join(full_text_parts)
+        # Check for non-Latin / non-English scripts (Hindi, Tamil, Telugu, etc.) and translate to English
+        segments = cls.translate_segments_to_english(segments)
+        clean_text = " ".join(s["text"] for s in segments)
         return clean_text, segments
+
+    @classmethod
+    def translate_segments_to_english(cls, segments: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Translates non-English caption segments to English in batches for maximum speed and zero cost."""
+        if not segments:
+            return []
+        
+        sample = " ".join(s.get("text", "") for s in segments[:8])
+        if not re.search(r'[\u0900-\u0D7F\u0E00-\u0FFF\u4E00-\u9FFF]', sample):
+            return segments
+
+        logger.info("Non-English transcript detected; translating segments to English...")
+        translated_segments = []
+        batch_size = 25
+        delimiter = "\n<<SEG>>\n"
+        
+        import urllib.request, urllib.parse, json
+        for i in range(0, len(segments), batch_size):
+            batch = segments[i:i + batch_size]
+            texts = [s.get("text", "") for s in batch]
+            try:
+                joined = delimiter.join(texts)
+                url = 'https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=en&dt=t&q=' + urllib.parse.quote(joined)
+                req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+                with urllib.request.urlopen(req, timeout=10) as resp:
+                    data = json.loads(resp.read().decode('utf-8'))
+                    translated_joined = ''.join([part[0] for part in data[0] if part[0]])
+                
+                parts = [p.strip() for p in translated_joined.split("<<SEG>>")]
+                for idx, s in enumerate(batch):
+                    new_text = parts[idx] if idx < len(parts) and parts[idx] else s["text"]
+                    translated_segments.append({
+                        **s,
+                        "text": new_text
+                    })
+            except Exception as e:
+                logger.warning(f"Batch translation notice at index {i}: {e}")
+                for s in batch:
+                    translated_segments.append(s)
+                    
+        return translated_segments
 
     @classmethod
     def chunk_transcript_by_time(cls, segments: List[Dict[str, Any]], chunk_seconds: int = 180) -> List[Dict[str, Any]]:

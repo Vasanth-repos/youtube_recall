@@ -7,7 +7,6 @@ project_root = os.path.abspath(SPECPATH)
 
 datas = [
     (os.path.join(project_root, 'frontend'), 'frontend'),
-    (os.path.join(project_root, 'backend', 'app'), 'backend/app'),
 ]
 
 hiddenimports = [
